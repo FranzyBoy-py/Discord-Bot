@@ -1,0 +1,13 @@
+.env
+database.sqlite
+database.sqlite-shm
+database.sqlite-wal
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.idea/
+.vscode/
+*.log

@@ -1,0 +1,10 @@
+discord.py[voice]
+fastapi
+uvicorn
+itsdangerous
+httpx
+python-dotenv
+yt-dlp
+google-genai
+jinja2
+aiohttp

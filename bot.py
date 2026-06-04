@@ -38,13 +38,24 @@ class MyBot(commands.Bot):
         cursor.execute("CREATE TABLE IF NOT EXISTS Tickets (ticketId INTEGER PRIMARY KEY AUTOINCREMENT, guildId TEXT, channelId TEXT, userId TEXT, status TEXT DEFAULT 'Open', reason TEXT, openedAt TEXT, closedAt TEXT, closedBy TEXT)")
         cursor.execute("CREATE TABLE IF NOT EXISTS TicketMessages (msgId INTEGER PRIMARY KEY AUTOINCREMENT, ticketId INTEGER, authorId TEXT, authorName TEXT, content TEXT, timestamp TEXT)")
         
-        # Add new columns if they don't exist (for existing databases)
-        try: cursor.execute("ALTER TABLE Guilds ADD COLUMN staffRoleId TEXT")
-        except: pass
-        try: cursor.execute("ALTER TABLE Users ADD COLUMN username TEXT")
-        except: pass
-        try: cursor.execute("ALTER TABLE Users ADD COLUMN avatar TEXT")
-        except: pass
+        # Robust Migration: Check for and add missing columns
+        migrations = [
+            ("Guilds", "staffRoleId", "TEXT"),
+            ("Guilds", "reportChannelId", "TEXT"),
+            ("Guilds", "appReviewChannelId", "TEXT"),
+            ("Users", "username", "TEXT"),
+            ("Users", "avatar", "TEXT")
+        ]
+        
+        for table, column, col_type in migrations:
+            cursor.execute(f"PRAGMA table_info({table})")
+            columns = [row[1] for row in cursor.fetchall()]
+            if column not in columns:
+                try:
+                    cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+                    print(f"✅ Migration: Added {column} to {table}")
+                except Exception as e:
+                    print(f"❌ Migration Error ({table}.{column}): {e}")
         
         self.db.commit()
 

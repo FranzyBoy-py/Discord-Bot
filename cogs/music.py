@@ -21,7 +21,6 @@ ytdl_format_options = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'auto',
-    'source_address': '0.0.0.0',
     'extract_audio': True,
     'audio_format': 'opus',
     'prefer_ffmpeg': True,

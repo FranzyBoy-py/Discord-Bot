@@ -58,6 +58,29 @@ A professional-grade Discord bot with a high-performance web dashboard, advanced
    python bot.py
    ```
 
+## 🌐 WispByte / Pterodactyl Deployment
+
+If you are deploying on WispByte or any Pterodactyl-based host, ensure the following:
+
+### 1. Port Mapping
+WispByte assigns you a specific port. Ensure your `.env` or Environment Variables include:
+```env
+PORT=your_assigned_port
+HOST=0.0.0.0
+```
+
+### 2. Redirect URI
+Your `DISCORD_REDIRECT_URI` must be the **public URL** of your dashboard, not localhost.
+Example: `https://your-bot.wispbyte.com/callback`
+
+### 3. FFMPEG
+The music system requires `ffmpeg`. Ensure it is installed in your container. If you are using a Python egg, it usually includes ffmpeg, but you may need to check with your host.
+
+### 4. Persistence
+Ensure `database.sqlite` is in a persistent directory so your data isn't lost on restart.
+
+---
+
 ## 📜 License
 This project is licensed under the MIT License - see the LICENSE file for details.
 

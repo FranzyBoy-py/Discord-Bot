@@ -2,12 +2,16 @@ import discord
 import os
 import sqlite3
 import asyncio
+import nest_asyncio
 from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
 import uvicorn
+from pyngrok import ngrok
 from dashboard import app as web_app
 
+# Apply nest_asyncio to allow nested event loops (required for uvicorn + discord.py)
+nest_asyncio.apply()
 load_dotenv()
 
 class MyBot(commands.Bot):
@@ -16,7 +20,9 @@ class MyBot(commands.Bot):
         intents.members = True
         intents.message_content = True
         super().__init__(command_prefix="!", intents=intents)
-        self.db = sqlite3.connect("database.sqlite", check_same_thread=False)
+        # Use absolute path for database on WispByte
+        db_path = os.path.join(os.getcwd(), "database.sqlite")
+        self.db = sqlite3.connect(db_path, check_same_thread=False, timeout=10)
         self.init_db()
 
     def init_db(self):
@@ -97,13 +103,22 @@ class MyBot(commands.Bot):
         host = os.getenv("HOST", "0.0.0.0")
         port = int(os.getenv("PORT", 8000))
         
+        # Setup Ngrok Tunnel
+        ngrok_token = os.getenv("NGROK_AUTHTOKEN")
+        if ngrok_token:
+            ngrok.set_auth_token(ngrok_token)
+            public_url = ngrok.connect(port).public_url
+            print(f"🌐 Public Tunnel: {public_url}")
+            print(f"🔗 Update your Discord Redirect URI to: {public_url}/callback")
+        
         config = uvicorn.Config(web_app, host=host, port=port, log_level="info")
         server = uvicorn.Server(config)
         asyncio.create_task(server.serve())
         print(f"🚀 Web Dashboard starting on {host}:{port}")
 
         # Load Cogs
-        for filename in os.listdir("./cogs"):
+        cogs_dir = os.path.join(os.getcwd(), "cogs")
+        for filename in os.listdir(cogs_dir):
             if filename.endswith(".py"):
                 try:
                     await self.load_extension(f"cogs.{filename[:-3]}")

@@ -8,7 +8,10 @@ import math
 
 load_dotenv()
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+
+# Use absolute path for templates on WispByte
+template_dir = os.path.join(os.getcwd(), "templates")
+templates = Jinja2Templates(directory=template_dir)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key")
 s = URLSafeTimedSerializer(SECRET_KEY)
@@ -18,7 +21,11 @@ CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI")
 
 def get_db():
-    return sqlite3.connect("database.sqlite")
+    return sqlite3.connect("database.sqlite", timeout=10)
+
+@app.get("/health")
+async def health_check():
+    return {"status": "operational", "bot_ready": hasattr(app.state, 'bot') and app.state.bot.is_ready()}
 
 async def resolve_user(bot, user_id, cache):
     if user_id in cache:

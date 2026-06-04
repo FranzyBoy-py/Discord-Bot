@@ -8,3 +8,6 @@ yt-dlp
 google-genai
 jinja2
 aiohttp
+python-multipart
+pyngrok
+nest_asyncio

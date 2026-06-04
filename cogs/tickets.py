@@ -15,8 +15,14 @@ class TicketReasonModal(discord.ui.Modal, title="Open a Ticket"):
     async def on_submit(self, interaction: discord.Interaction):
         # We need to get the category and other data from the DB
         cursor = interaction.client.db.cursor()
-        cursor.execute("SELECT ticketCategoryId, staffRoleId FROM Guilds WHERE guildId = ?", (str(interaction.guild_id),))
-        row = cursor.fetchone()
+        try:
+            cursor.execute("SELECT ticketCategoryId, staffRoleId FROM Guilds WHERE guildId = ?", (str(interaction.guild_id),))
+            row = cursor.fetchone()
+        except Exception:
+            # Fallback if the database hasn't been migrated yet
+            cursor.execute("SELECT ticketCategoryId FROM Guilds WHERE guildId = ?", (str(interaction.guild_id),))
+            r = cursor.fetchone()
+            row = (r[0], None) if r else None
         
         category_id = int(row[0]) if row and row[0] else None
         staff_role_id = int(row[1]) if row and row[1] else None

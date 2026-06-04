@@ -3,6 +3,7 @@ import os
 import sqlite3
 import asyncio
 import nest_asyncio
+import sys
 from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -22,12 +23,15 @@ class MyBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
         # Use absolute path for database on WispByte
         db_path = os.path.join(os.getcwd(), "database.sqlite")
+        print(f"DATABASE PATH: {db_path}", flush=True)
         self.db = sqlite3.connect(db_path, check_same_thread=False, timeout=10)
         self.init_db()
 
     def init_db(self):
         cursor = self.db.cursor()
         cursor.execute("PRAGMA journal_mode=WAL") # Enable WAL mode for concurrency
+        
+        # Standard table creation
         cursor.execute("CREATE TABLE IF NOT EXISTS Guilds (guildId TEXT PRIMARY KEY, welcomeChannelId TEXT, logChannelId TEXT, reportChannelId TEXT, verificationRoleId TEXT, autoModEnabled INTEGER DEFAULT 1, bannedWords TEXT DEFAULT '[]', ticketCategoryId TEXT, ticketLogChannelId TEXT, suggestionChannelId TEXT, autoRoleId TEXT, staffRoleId TEXT, themeColor TEXT DEFAULT '#3498DB', appReviewChannelId TEXT, appQuestions TEXT DEFAULT '[\"What is your name?\", \"How old are you?\", \"Why do you want to join?\"]')")
         cursor.execute("CREATE TABLE IF NOT EXISTS Users (userId TEXT, guildId TEXT, username TEXT, avatar TEXT, xp INTEGER DEFAULT 0, level INTEGER DEFAULT 0, coins INTEGER DEFAULT 0, lastDaily TEXT, lastWork TEXT, PRIMARY KEY (userId, guildId))")
         cursor.execute("CREATE TABLE IF NOT EXISTS AutoResponders (guildId TEXT, trigger TEXT, response TEXT, PRIMARY KEY (guildId, trigger))")
@@ -48,30 +52,28 @@ class MyBot(commands.Bot):
         ]
         
         for table, column, col_type in migrations:
-            cursor.execute(f"PRAGMA table_info({table})")
-            columns = [row[1] for row in cursor.fetchall()]
-            if column not in columns:
-                try:
+            try:
+                cursor.execute(f"PRAGMA table_info({table})")
+                cols = [row[1] for row in cursor.fetchall()]
+                if column not in cols:
+                    print(f"MIGRATION: Adding {column} to {table}", flush=True)
                     cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
-                    print(f"✅ Migration: Added {column} to {table}")
-                except Exception as e:
-                    print(f"❌ Migration Error ({table}.{column}): {e}")
+            except Exception as e:
+                print(f"MIGRATION ERROR ({table}.{column}): {e}", flush=True)
         
         self.db.commit()
+        print("DATABASE INITIALIZED", flush=True)
 
     def get_theme_color(self, guild_id):
-        if not guild_id:
-            return 0x3498DB
+        if not guild_id: return 0x3498DB
         cursor = self.db.cursor()
         cursor.execute("SELECT themeColor FROM Guilds WHERE guildId = ?", (str(guild_id),))
         row = cursor.fetchone()
         if row and row[0]:
             try:
-                # Handle both #RRGGBB and 0xRRGGBB or plain hex
                 color_str = row[0].lstrip('#').replace('0x', '')
                 return int(color_str, 16)
-            except:
-                return 0x3498DB
+            except: return 0x3498DB
         return 0x3498DB
 
     def ensure_guild(self, guild_id):
@@ -81,68 +83,50 @@ class MyBot(commands.Bot):
 
     async def setup_hook(self):
         # Register Persistent Views
-        from cogs.server_setup import RulesRoleView
-        from cogs.tickets import TicketOpenView, TicketCloseView
-        from cogs.applications import ApplicationLaunchView, ApplicationReviewView
-        from cogs.reaction_roles import RoleView
-        self.add_view(RulesRoleView())
-        self.add_view(TicketOpenView())
-        self.add_view(TicketCloseView())
-        self.add_view(ApplicationLaunchView())
-        self.add_view(ApplicationReviewView())
-        self.add_view(RoleView())
+        try:
+            from cogs.server_setup import RulesRoleView
+            from cogs.tickets import TicketOpenView, TicketCloseView
+            from cogs.applications import ApplicationLaunchView, ApplicationReviewView
+            from cogs.reaction_roles import RoleView
+            self.add_view(RulesRoleView())
+            self.add_view(TicketOpenView())
+            self.add_view(TicketCloseView())
+            self.add_view(ApplicationLaunchView())
+            self.add_view(ApplicationReviewView())
+            self.add_view(RoleView())
+        except Exception as e:
+            print(f"VIEW REGISTRATION ERROR: {e}", flush=True)
         
         # Global Error Handler for Slash Commands
         @self.tree.error
         async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
             if isinstance(error, app_commands.MissingPermissions):
-                await interaction.response.send_message(f"❌ You need `{', '.join(error.missing_permissions)}` permissions to use this!", ephemeral=True)
+                await interaction.response.send_message(f"Missing permissions: {', '.join(error.missing_permissions)}", ephemeral=True)
             elif isinstance(error, app_commands.CommandOnCooldown):
-                await interaction.response.send_message(f"⏳ Slow down! Try again in {error.retry_after:.2f}s.", ephemeral=True)
-            elif isinstance(error, app_commands.BotMissingPermissions):
-                await interaction.response.send_message(f"🚫 I'm missing permissions: `{', '.join(error.missing_permissions)}`", ephemeral=True)
+                await interaction.response.send_message(f"Cooldown: Try again in {error.retry_after:.2f}s", ephemeral=True)
             else:
-                print(f"Slash Command Error: {error}")
-                try:
-                    if not interaction.response.is_done():
-                        await interaction.response.send_message("⚠️ An unexpected error occurred while running this command.", ephemeral=True)
-                    else:
-                        await interaction.followup.send("⚠️ An unexpected error occurred.", ephemeral=True)
-                except (discord.NotFound, discord.HTTPException) as e:
-                    print(f"Could not send error message to user: {e}")
+                print(f"SLASH COMMAND ERROR: {error}", flush=True)
 
-        # Correct asyncio-friendly way to run the dashboard
+        # Dashboard Setup
         web_app.state.bot = self
-        
-        # Deployment configuration for WispByte/Production
         host = os.getenv("HOST", "0.0.0.0")
         port = int(os.getenv("PORT", 8000))
         
-        # Setup Ngrok Tunnel
         ngrok_token = os.getenv("NGROK_AUTHTOKEN")
         if ngrok_token:
-            ngrok.set_auth_token(ngrok_token)
-            public_url = ngrok.connect(port).public_url
-            print(f"🌐 Public Tunnel: {public_url}")
-            print(f"🔗 Update your Discord Redirect URI to: {public_url}/callback")
+            try:
+                ngrok.set_auth_token(ngrok_token)
+                public_url = ngrok.connect(port).public_url
+                print(f"PUBLIC TUNNEL: {public_url}", flush=True)
+            except Exception as e:
+                print(f"NGROK ERROR: {e}", flush=True)
         
         config = uvicorn.Config(web_app, host=host, port=port, log_level="info")
         server = uvicorn.Server(config)
         
-        # Start uvicorn in a background task
-        loop = asyncio.get_running_loop()
-        server_task = loop.create_task(server.serve())
-        
-        def on_server_exit(task):
-            try:
-                task.result()
-            except Exception as e:
-                print(f"❌ Dashboard Server Error: {e}")
-        
-        server_task.add_done_callback(on_server_exit)
-        print(f"🚀 Web Dashboard starting on {host}:{port}")
-        if os.getenv("DISCORD_REDIRECT_URI"):
-            print(f"🔗 Expected Redirect URI: {os.getenv('DISCORD_REDIRECT_URI')}")
+        # Background task for dashboard
+        asyncio.create_task(server.serve())
+        print(f"DASHBOARD RUNNING ON {host}:{port}", flush=True)
 
         # Load Cogs
         cogs_dir = os.path.join(os.getcwd(), "cogs")
@@ -150,31 +134,28 @@ class MyBot(commands.Bot):
             if filename.endswith(".py"):
                 try:
                     await self.load_extension(f"cogs.{filename[:-3]}")
-                    print(f"✅ Loaded cog: {filename}")
+                    print(f"LOADED COG: {filename}", flush=True)
                 except Exception as e:
-                    print(f"❌ Failed to load cog {filename}: {e}")
+                    print(f"COG LOAD ERROR ({filename}): {e}", flush=True)
         
         await self.tree.sync()
-        print(f"🤖 Bot is logged in as {self.user} (ID: {self.user.id})")
-        print(f"📊 Connected to {len(self.guilds)} guilds.")
-        print(f"Synced slash commands for {self.user}")
 
     async def on_ready(self):
-        await bot.change_presence(activity=discord.Game(name="I Like Cats 😺"))
-        print(f"Logged in as {self.user} (Python Local Storage Mode)")
+        await self.change_presence(activity=discord.Game(name="Helping out!"))
+        print(f"LOGGED IN AS {self.user}", flush=True)
 
 bot = MyBot()
 
 @bot.command()
 @commands.is_owner()
 async def sync(ctx):
-    await ctx.send("🔄 Syncing commands...")
+    await ctx.send("Syncing...")
     synced = await bot.tree.sync()
-    await ctx.send(f"✅ Synced **{len(synced)}** commands!")
+    await ctx.send(f"Synced {len(synced)} commands")
 
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
     if token:
         bot.run(token)
     else:
-        print("Missing DISCORD_TOKEN in .env")
+        print("MISSING DISCORD_TOKEN", flush=True)

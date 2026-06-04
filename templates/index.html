@@ -305,7 +305,7 @@
             <div class="grid-3">
                 <div class="card"><div class="stat-val">{{ bot_stats.latency }}ms</div><p class="stat-label">Network Ping</p></div>
                 <div class="card"><div class="stat-val">{{ managed_guilds|length }}</div><p class="stat-label">Authorized Servers</p></div>
-                <div class="card"><div class="stat-val">{{ tickets|selectattr('4', 'equalto', 'Open')|list|length }}</div><p class="stat-label">Active Tickets</p></div>
+                <div class="card"><div class="stat-val">{{ tickets|selectattr('status', 'equalto', 'Open')|list|length }}</div><p class="stat-label">Active Tickets</p></div>
             </div>
             <div class="card" style="padding:0; overflow:hidden;">
                 <div style="padding:32px 32px 0;"><h3 class="card-title"><i class="fas fa-crown"></i> GLOBAL LEADERBOARD</h3></div>
@@ -334,19 +334,19 @@
 
         <div id="v-control" class="view-pane guild-required">
             {% for g in guilds %}
-            <div class="guild-specific-view gid-{{ g[0] }}" style="display:none;">
+            <div class="guild-specific-view gid-{{ g.guildId }}" style="display:none;">
                 <div class="card">
                     <h3 class="card-title">Broadcast Module</h3>
                     <div class="field">
                         <label>Target Channel</label>
-                        <select id="chan-{{ g[0] }}" class="input-dark">
-                            {% for c in (g[15] if (g and g|length > 15 and g[15] is not none) else []) %}
+                        <select id="chan-{{ g.guildId }}" class="input-dark">
+                            {% for c in (g.channels if g.channels is not none else []) %}
                             <option value="{{ c.id }}"># {{ c.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="field"><label>Message Content</label><textarea id="msg-{{ g[0] }}" class="input-dark" rows="3"></textarea></div>
-                    <button class="btn btn-accent" onclick="sendMsg('{{ g[0] }}')">EXECUTE BROADCAST</button>
+                    <div class="field"><label>Message Content</label><textarea id="msg-{{ g.guildId }}" class="input-dark" rows="3"></textarea></div>
+                    <button class="btn btn-accent" onclick="sendMsg('{{ g.guildId }}')">EXECUTE BROADCAST</button>
                 </div>
             </div>
             {% endfor %}
@@ -354,17 +354,17 @@
 
         <div id="v-settings" class="view-pane guild-required">
             {% for g in guilds %}
-            <div class="guild-specific-view gid-{{ g[0] }}" style="display:none;">
+            <div class="guild-specific-view gid-{{ g.guildId }}" style="display:none;">
                 <div class="card">
                     <h3 class="card-title">Server Parameters</h3>
                     <form onsubmit="saveSync(event, this)">
-                        <input type="hidden" name="guildId" value="{{ g[0] }}">
+                        <input type="hidden" name="guildId" value="{{ g.guildId }}">
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
-                            <div class="field"><label>Welcome Node</label><input type="text" name="welcomeChannel" value="{{ g[1] or '' }}" class="input-dark"></div>
-                            <div class="field"><label>Audit Feed</label><input type="text" name="logChannel" value="{{ g[2] or '' }}" class="input-dark"></div>
-                            <div class="field"><label>Staff Reviews</label><input type="text" name="appReviewChannel" value="{{ g[12] or '' }}" class="input-dark"></div>
-                            <div class="field"><label>Staff Role ID</label><input type="text" name="staffRole" value="{{ g[14] or '' }}" class="input-dark" placeholder="Role ID for tickets"></div>
-                            <div class="field"><label>UI Accent</label><input type="color" name="themeColor" value="{{ g[11] or '#3498DB' }}" style="height:54px; width:100%; border-radius:14px; background:#000; border:1px solid var(--border); padding:5px;"></div>
+                            <div class="field"><label>Welcome Node</label><input type="text" name="welcomeChannel" value="{{ g.welcomeChannelId or '' }}" class="input-dark"></div>
+                            <div class="field"><label>Audit Feed</label><input type="text" name="logChannel" value="{{ g.logChannelId or '' }}" class="input-dark"></div>
+                            <div class="field"><label>Staff Reviews</label><input type="text" name="appReviewChannel" value="{{ g.appReviewChannelId or '' }}" class="input-dark"></div>
+                            <div class="field"><label>Staff Role ID</label><input type="text" name="staffRole" value="{{ g.staffRoleId or '' }}" class="input-dark" placeholder="Role ID for tickets"></div>
+                            <div class="field"><label>UI Accent</label><input type="color" name="themeColor" value="{{ g.themeColor or '#3498DB' }}" style="height:54px; width:100%; border-radius:14px; background:#000; border:1px solid var(--border); padding:5px;"></div>
                         </div>
                         <button type="submit" class="btn btn-accent" style="width:100%; margin-top:24px;">SYNC CLOUD STORAGE</button>
                     </form>
@@ -376,13 +376,13 @@
         <div id="v-tickets" class="view-pane guild-required">
             <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:24px;">
                 {% for t in tickets %}
-                <div class="card item-card gid-{{ t[1] }}" style="display:none;" onclick="openT({{ t[0] }}, '{{ t[9]|replace("'", "\\'") }}')">
+                <div class="card item-card gid-{{ t.guildId }}" style="display:none;" onclick="openT({{ t.ticketId }}, '{{ t.userName|replace("'", "\\'") }}')">
                     <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
-                        <span style="font-size:11px; font-weight:800; color:{% if t[4]=='Open' %}var(--success){% else %}var(--text-dim){% endif %};">{{ t[4]|upper }}</span>
-                        <span style="font-family:monospace; font-size:10px; opacity:0.5;">#{{ t[0] }}</span>
+                        <span style="font-size:11px; font-weight:800; color:{% if t.status=='Open' %}var(--success){% else %}var(--text-dim){% endif %};">{{ t.status|upper }}</span>
+                        <span style="font-family:monospace; font-size:10px; opacity:0.5;">#{{ t.ticketId }}</span>
                     </div>
-                    <p style="font-weight:800; font-size:15px; margin-bottom:4px;">{{ t[9] }}</p>
-                    <p style="font-size:12px; color:var(--text-dim);">Reason: {{ t[5] or 'N/A' }}</p>
+                    <p style="font-weight:800; font-size:15px; margin-bottom:4px;">{{ t.userName }}</p>
+                    <p style="font-size:12px; color:var(--text-dim);">Reason: {{ t.reason or 'N/A' }}</p>
                 </div>
                 {% endfor %}
             </div>
@@ -395,13 +395,13 @@
                         <thead><tr><th>MEMBER</th><th>BALANCE</th><th>ACTION</th></tr></thead>
                         <tbody>
                             {% for u in top_users %}
-                            <tr class="guild-specific-view gid-{{ u.guild_id }}" style="display:none;">
+                            <tr class="guild-specific-view gid-{{ u.guildId }}" style="display:none;">
                                 <td style="display:flex; align-items:center; gap:12px;">
                                     <img src="{{ u.avatar }}" style="width:32px; height:32px; border-radius:10px;">
                                     {{ u.name }}
                                 </td>
-                                <td><input type="number" name="coins" id="eco-{{ u.guild_id }}-{{ u.id }}" value="{{ u.coins }}" class="input-dark" style="padding:8px 12px; border-radius:10px; width:140px;"></td>
-                                <td><button class="btn btn-accent" style="padding:8px 16px; font-size:11px;" onclick="upEco('{{ u.id }}', '{{ u.guild_id }}')">UPDATE</button></td>
+                                <td><input type="number" name="coins" id="eco-{{ u.guildId }}-{{ u.userId }}" value="{{ u.coins }}" class="input-dark" style="padding:8px 12px; border-radius:10px; width:140px;"></td>
+                                <td><button class="btn btn-accent" style="padding:8px 16px; font-size:11px;" onclick="upEco('{{ u.userId }}', '{{ u.guildId }}')">UPDATE</button></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -417,11 +417,11 @@
                         <thead><tr><th>TARGET</th><th>MODERATOR</th><th>REASON</th><th>TIME</th></tr></thead>
                         <tbody>
                             {% for w in warnings %}
-                            <tr class="guild-specific-view gid-{{ w[1] }}" style="display:none;">
-                                <td><b>{{ w[6] }}</b></td>
-                                <td>{{ w[7] }}</td>
-                                <td>{{ w[4] }}</td>
-                                <td style="font-size:11px; color:var(--text-dim);">{{ w[5][:16].replace('T', ' ') }}</td>
+                            <tr class="guild-specific-view gid-{{ w.guildId }}" style="display:none;">
+                                <td><b>{{ w.userName }}</b></td>
+                                <td>{{ w.modName }}</td>
+                                <td>{{ w.reason }}</td>
+                                <td style="font-size:11px; color:var(--text-dim);">{{ w.timestamp[:16].replace('T', ' ') }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -433,13 +433,13 @@
         <div id="v-apps" class="view-pane guild-required">
             <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:24px;">
                 {% for a in applications %}
-                <div class="card gid-{{ a[1] }} guild-specific-view" style="display:none;">
+                <div class="card gid-{{ a.guildId }} guild-specific-view" style="display:none;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
-                        <span class="badge" style="background:var(--accent-dim); color:var(--accent);">{{ a[4]|upper }}</span>
-                        <span style="font-family:monospace; font-size:10px; opacity:0.5;">#{{ a[0] }}</span>
+                        <span class="badge" style="background:var(--accent-dim); color:var(--accent);">{{ a.status|upper }}</span>
+                        <span style="font-family:monospace; font-size:10px; opacity:0.5;">#{{ a.appId }}</span>
                     </div>
-                    <p style="font-weight:800;">{{ a[6] }}</p>
-                    <p style="font-size:12px; color:var(--text-dim); margin-top:8px;">Submitted: {{ a[5][:16].replace('T', ' ') }}</p>
+                    <p style="font-weight:800;">{{ a.userName }}</p>
+                    <p style="font-size:12px; color:var(--text-dim); margin-top:8px;">Submitted: {{ a.timestamp[:16].replace('T', ' ') }}</p>
                 </div>
                 {% endfor %}
             </div>
@@ -461,11 +461,11 @@
                         <thead><tr><th>TRIGGER</th><th>RESPONSE</th><th>ACTION</th></tr></thead>
                         <tbody id="responder-table-body">
                             {% for r in responders %}
-                            <tr class="guild-specific-view gid-{{ r[0] }}" style="display:none;">
-                                <td style="color:var(--accent);"><b>{{ r[1] }}</b></td>
-                                <td style="font-size:12px;">{{ r[2][:60] }}...</td>
+                            <tr class="guild-specific-view gid-{{ r.guildId }}" style="display:none;">
+                                <td style="color:var(--accent);"><b>{{ r.trigger }}</b></td>
+                                <td style="font-size:12px;">{{ r.response[:60] }}...</td>
                                 <td>
-                                    <button type="button" class="btn btn-danger" style="padding:8px;" onclick="delTrigger('{{ r[0] }}', '{{ r[1]|replace("'", "\\'") }}', this.parentElement.parentElement)">
+                                    <button type="button" class="btn btn-danger" style="padding:8px;" onclick="delTrigger('{{ r.guildId }}', '{{ r.trigger|replace("'", "\\'") }}', this.parentElement.parentElement)">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>

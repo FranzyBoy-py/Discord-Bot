@@ -22,7 +22,9 @@ CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI")
 
 def get_db():
-    return sqlite3.connect("database.sqlite", timeout=10)
+    conn = sqlite3.connect("database.sqlite", timeout=10)
+    conn.row_factory = sqlite3.Row # Return results as dictionaries
+    return conn
 
 @app.get("/health")
 async def health_check():
@@ -107,56 +109,60 @@ async def index(request: Request, user_session: str = Cookie(None)):
         all_guilds_data = db.execute("SELECT * FROM Guilds").fetchall()
         guilds = []
         for g in all_guilds_data:
-            gid_str = str(g[0])
+            g_dict = dict(g)
+            gid_str = g_dict['guildId']
             if gid_str in managed_guilds:
                 discord_guild = bot.get_guild(int(gid_str)) if bot else None
                 if discord_guild:
-                    channels = [{"id": str(c.id), "name": c.name} for c in discord_guild.text_channels]
+                    g_dict['channels'] = [{"id": str(c.id), "name": c.name} for c in discord_guild.text_channels]
                 else:
-                    channels = []
-                guilds.append(list(g) + [channels])
+                    g_dict['channels'] = []
+                guilds.append(g_dict)
 
         # Use app-level cache
         cache = request.app.state.user_cache
         placeholders = ','.join(['?'] * len(managed_guilds)) if managed_guilds else "''"
         gids = list(managed_guilds.keys()) if managed_guilds else []
         
-        raw_top_users = db.execute(f"SELECT userId, level, xp, coins, username, avatar, guildId FROM Users WHERE guildId IN ({placeholders}) ORDER BY level DESC, xp DESC LIMIT 20", gids).fetchall() if gids else []
+        raw_top_users = db.execute(f"SELECT * FROM Users WHERE guildId IN ({placeholders}) ORDER BY level DESC, xp DESC LIMIT 20", gids).fetchall() if gids else []
         
         top_users = []
         for u in raw_top_users:
-            uid, lvl, xp, coins, db_name, db_avatar, gid = u
-            if db_name:
-                name, avatar = db_name, db_avatar
+            u_dict = dict(u)
+            uid = u_dict['userId']
+            if u_dict['username']:
+                name, avatar = u_dict['username'], u_dict['avatar']
                 cache[uid] = (name, avatar)
             else:
                 name, avatar = await resolve_user(bot, uid, cache)
-            top_users.append({
-                "id": uid, "level": lvl or 0, "xp": xp or 0, "coins": coins if coins is not None else 0, 
-                "name": name, "avatar": avatar, "guild_id": gid
-            })
+            u_dict['name'] = name
+            u_dict['avatar'] = avatar
+            top_users.append(u_dict)
 
-        active_giveaways = db.execute("SELECT prize, endTime, guildId FROM Giveaways WHERE active = 1").fetchall()
-        
-        tickets_raw = db.execute(f"SELECT * FROM Tickets WHERE guildId IN ({placeholders}) ORDER BY status DESC, openedAt DESC LIMIT 20", gids).fetchall() if gids else []
+        active_giveaways = [dict(r) for r in db.execute("SELECT * FROM Giveaways WHERE active = 1").fetchall()]
+        tickets_raw = [dict(r) for r in db.execute(f"SELECT * FROM Tickets WHERE guildId IN ({placeholders}) ORDER BY status DESC, openedAt DESC LIMIT 20", gids).fetchall()] if gids else []
         tickets = []
         for t in tickets_raw:
-            uname, _ = await resolve_user(bot, t[3], cache)
-            tickets.append(list(t) + [uname])
+            uname, _ = await resolve_user(bot, t['userId'], cache)
+            t['userName'] = uname
+            tickets.append(t)
 
-        responders = db.execute(f"SELECT * FROM AutoResponders WHERE guildId IN ({placeholders})", gids).fetchall() if gids else []
-        warnings_raw = db.execute(f"SELECT * FROM Warnings WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC LIMIT 20", gids).fetchall() if gids else []
+        responders = [dict(r) for r in db.execute(f"SELECT * FROM AutoResponders WHERE guildId IN ({placeholders})", gids).fetchall()] if gids else []
+        warnings_raw = [dict(r) for r in db.execute(f"SELECT * FROM Warnings WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC LIMIT 20", gids).fetchall()] if gids else []
         warnings = []
         for w in warnings_raw:
-            uname, _ = await resolve_user(bot, w[2], cache)
-            mname, _ = await resolve_user(bot, w[3], cache)
-            warnings.append(list(w) + [uname, mname])
+            uname, _ = await resolve_user(bot, w['userId'], cache)
+            mname, _ = await resolve_user(bot, w['moderatorId'], cache)
+            w['userName'] = uname
+            w['modName'] = mname
+            warnings.append(w)
 
-        apps_raw = db.execute(f"SELECT * FROM Applications WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC LIMIT 20", gids).fetchall() if gids else []
+        apps_raw = [dict(r) for r in db.execute(f"SELECT * FROM Applications WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC LIMIT 20", gids).fetchall()] if gids else []
         apps = []
         for a in apps_raw:
-            uname, _ = await resolve_user(bot, a[2], cache)
-            apps.append(list(a) + [uname])
+            uname, _ = await resolve_user(bot, a['userId'], cache)
+            a['userName'] = uname
+            apps.append(a)
 
     return templates.TemplateResponse(request=request, name="index.html", context={
         "guilds": guilds, "managed_guilds": managed_guilds, "top_users": top_users, 
@@ -222,7 +228,7 @@ async def get_ticket_messages(ticket_id: int, user_session: str = Cookie(None)):
     if not user_session: raise HTTPException(status_code=403)
     with get_db() as db:
         messages = db.execute("SELECT authorName, content, timestamp FROM TicketMessages WHERE ticketId = ? ORDER BY timestamp ASC", (ticket_id,)).fetchall()
-    return [{"author": m[0], "content": m[1], "time": m[2]} for m in messages]
+    return [{"author": m['authorName'], "content": m['content'], "time": m['timestamp']} for m in messages]
 
 @app.post("/update")
 async def update_settings(

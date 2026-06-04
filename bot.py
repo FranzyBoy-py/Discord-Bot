@@ -92,17 +92,28 @@ class MyBot(commands.Bot):
 
         # Correct asyncio-friendly way to run the dashboard
         web_app.state.bot = self
-        config = uvicorn.Config(web_app, host="127.0.0.1", port=8000, log_level="info")
+        
+        # Deployment configuration for WispByte/Production
+        host = os.getenv("HOST", "0.0.0.0")
+        port = int(os.getenv("PORT", 8000))
+        
+        config = uvicorn.Config(web_app, host=host, port=port, log_level="info")
         server = uvicorn.Server(config)
         asyncio.create_task(server.serve())
-        print("🚀 Web Dashboard running at http://127.0.0.1:8000")
+        print(f"🚀 Web Dashboard starting on {host}:{port}")
 
         # Load Cogs
         for filename in os.listdir("./cogs"):
             if filename.endswith(".py"):
-                await self.load_extension(f"cogs.{filename[:-3]}")
+                try:
+                    await self.load_extension(f"cogs.{filename[:-3]}")
+                    print(f"✅ Loaded cog: {filename}")
+                except Exception as e:
+                    print(f"❌ Failed to load cog {filename}: {e}")
         
         await self.tree.sync()
+        print(f"🤖 Bot is logged in as {self.user} (ID: {self.user.id})")
+        print(f"📊 Connected to {len(self.guilds)} guilds.")
         print(f"Synced slash commands for {self.user}")
 
     async def on_ready(self):

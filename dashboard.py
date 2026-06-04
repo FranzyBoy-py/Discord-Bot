@@ -103,9 +103,22 @@ async def index(request: Request, user_session: str = Cookie(None)):
         all_guilds_data = db.execute("SELECT * FROM Guilds").fetchall()
         guilds = []
         for g in all_guilds_data:
-            if g[0] in managed_guilds:
-                discord_guild = bot.get_guild(int(g[0])) if bot else None
-                channels = [{"id": str(c.id), "name": c.name} for c in discord_guild.text_channels] if discord_guild else []
+            gid_str = str(g[0])
+            if gid_str in managed_guilds:
+                discord_guild = bot.get_guild(int(gid_str)) if bot else None
+                
+                # If bot doesn't have it in cache, try fetching it (might be slow but robust)
+                if not discord_guild and bot:
+                    try:
+                        discord_guild = bot.get_guild(int(gid_str)) # Re-check
+                    except: pass
+                
+                if discord_guild:
+                    # Filter for actual text channels the bot can see
+                    channels = [{"id": str(c.id), "name": c.name} for c in discord_guild.text_channels]
+                else:
+                    channels = []
+                
                 guilds.append(list(g) + [channels])
 
 

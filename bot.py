@@ -84,11 +84,13 @@ class MyBot(commands.Bot):
         from cogs.server_setup import RulesRoleView
         from cogs.tickets import TicketOpenView, TicketCloseView
         from cogs.applications import ApplicationLaunchView, ApplicationReviewView
+        from cogs.reaction_roles import RoleView
         self.add_view(RulesRoleView())
         self.add_view(TicketOpenView())
         self.add_view(TicketCloseView())
         self.add_view(ApplicationLaunchView())
         self.add_view(ApplicationReviewView())
+        self.add_view(RoleView())
         
         # Global Error Handler for Slash Commands
         @self.tree.error

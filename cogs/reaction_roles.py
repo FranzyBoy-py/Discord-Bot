@@ -17,22 +17,37 @@ class ReactionRoles(commands.Cog):
         await interaction.channel.send(embed=embed, view=view)
 
 class RoleView(discord.ui.View):
-    def __init__(self, role_id, label):
+    def __init__(self, role_id=None, label=None):
         super().__init__(timeout=None)
-        self.role_id = role_id
         
-        # Add the button dynamically
-        button = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary, custom_id=f"role_{role_id}")
-        button.callback = self.button_callback
-        self.add_item(button)
+        if role_id and label:
+            # Creation mode
+            button = discord.ui.Button(
+                label=label, 
+                style=discord.ButtonStyle.secondary, 
+                custom_id=f"persistent_role_{role_id}"
+            )
+            button.callback = self.button_callback
+            self.add_item(button)
 
     async def button_callback(self, interaction: discord.Interaction):
-        role = interaction.guild.get_role(self.role_id)
+        # Extract role_id from custom_id if it's a persistent interaction
+        custom_id = interaction.data.get("custom_id", "")
+        if custom_id.startswith("persistent_role_"):
+            try:
+                role_id = int(custom_id.replace("persistent_role_", ""))
+            except:
+                return await interaction.response.send_message("Invalid role data!", ephemeral=True)
+        else:
+            return await interaction.response.send_message("Interaction error!", ephemeral=True)
+
+        role = interaction.guild.get_role(role_id)
         if not role:
             return await interaction.response.send_message("Role not found!", ephemeral=True)
 
         if role in interaction.user.roles:
-            await interaction.response.send_message(f"You already have **{role.name}** role!", ephemeral=True)
+            await interaction.user.remove_roles(role)
+            await interaction.response.send_message(f"Removed the **{role.name}** role!", ephemeral=True)
         else:
             await interaction.user.add_roles(role)
             await interaction.response.send_message(f"Added the **{role.name}** role!", ephemeral=True)

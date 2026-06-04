@@ -14,8 +14,8 @@ class Economy(commands.Cog):
         cursor.execute("SELECT userId, guildId, xp, level, coins, lastDaily, lastWork, username, avatar FROM Users WHERE userId = ? AND guildId = ?", (str(user_id), str(guild_id)))
         row = cursor.fetchone()
         
-        name = member.name if member else None
-        avatar = str(member.display_avatar.url) if member else None
+        name = member.name if member else (row[7] if row else None)
+        avatar = str(member.display_avatar.url) if member else (row[8] if row else None)
 
         if not row:
             cursor.execute("INSERT INTO Users (userId, guildId, username, avatar) VALUES (?, ?, ?, ?)", 

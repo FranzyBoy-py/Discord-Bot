@@ -121,10 +121,17 @@ async def index(request: Request, user_session: str = Cookie(None)):
 
         # Use app-level cache
         cache = request.app.state.user_cache
-        placeholders = ','.join(['?'] * len(managed_guilds)) if managed_guilds else "''"
         gids = list(managed_guilds.keys()) if managed_guilds else []
         
-        raw_top_users = db.execute(f"SELECT * FROM Users WHERE guildId IN ({placeholders}) ORDER BY level DESC, xp DESC LIMIT 20", gids).fetchall() if gids else []
+        if gids:
+            placeholders = ','.join(['?'] * len(gids))
+            raw_top_users = [dict(r) for r in db.execute(f"SELECT * FROM Users WHERE guildId IN ({placeholders}) ORDER BY level DESC, xp DESC LIMIT 20", gids).fetchall()]
+            tickets_raw = [dict(r) for r in db.execute(f"SELECT * FROM Tickets WHERE guildId IN ({placeholders}) ORDER BY status DESC, openedAt DESC LIMIT 20", gids).fetchall()]
+            responders = [dict(r) for r in db.execute(f"SELECT * FROM AutoResponders WHERE guildId IN ({placeholders})", gids).fetchall()]
+            warnings_raw = [dict(r) for r in db.execute(f"SELECT * FROM Warnings WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC LIMIT 20", gids).fetchall()]
+            apps_raw = [dict(r) for r in db.execute(f"SELECT * FROM Applications WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC LIMIT 20", gids).fetchall()]
+        else:
+            raw_top_users, tickets_raw, responders, warnings_raw, apps_raw = [], [], [], [], []
         
         top_users = []
         for u in raw_top_users:

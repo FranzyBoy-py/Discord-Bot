@@ -36,8 +36,8 @@ A professional-grade Discord bot with a high-performance web dashboard, advanced
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-   cd "Public Discord Bot"
+   git clone https://github.com/liad81/Discord-Bot.git
+   cd "Discord-Bot"
    ```
 2. Install dependencies:
    ```bash

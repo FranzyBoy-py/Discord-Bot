@@ -14,7 +14,7 @@ class AI(commands.Cog):
     async def ask(self, interaction: discord.Interaction, prompt: str):
         await interaction.response.defer()
         try:
-            # Use a valid Gemini model
+            # Use a valid Gemini model name
             response = await self.client.aio.models.generate_content(
                 model="gemini-1.5-flash",
                 contents=prompt,

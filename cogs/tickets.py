@@ -80,7 +80,7 @@ class Tickets(commands.Cog):
 
     @app_commands.command(name="ticket_setup", description="Create the ticket opening message.")
     @app_commands.checks.has_permissions(administrator=True)
-    async def ticket_setup(self, interaction: discord.Interaction, category: discord.CategoryChannel = None, log_channel: discord.TextChannel = None):
+    async def ticket_setup(self, interaction: discord.Interaction, category: discord.CategoryChannel = None, log_channel: discord.TextChannel = None, staff_role: discord.Role = None):
         
         cursor = self.bot.db.cursor()
         cursor.execute("SELECT * FROM Guilds WHERE guildId = ?", (str(interaction.guild_id),))
@@ -91,6 +91,8 @@ class Tickets(commands.Cog):
             cursor.execute("UPDATE Guilds SET ticketCategoryId = ? WHERE guildId = ?", (str(category.id), str(interaction.guild_id)))
         if log_channel:
             cursor.execute("UPDATE Guilds SET ticketLogChannelId = ? WHERE guildId = ?", (str(log_channel.id), str(interaction.guild_id)))
+        if staff_role:
+            cursor.execute("UPDATE Guilds SET staffRoleId = ? WHERE guildId = ?", (str(staff_role.id), str(interaction.guild_id)))
             
         self.bot.db.commit()
 

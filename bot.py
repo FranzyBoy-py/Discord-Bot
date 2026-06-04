@@ -28,7 +28,7 @@ class MyBot(commands.Bot):
     def init_db(self):
         cursor = self.db.cursor()
         cursor.execute("PRAGMA journal_mode=WAL") # Enable WAL mode for concurrency
-        cursor.execute("CREATE TABLE IF NOT EXISTS Guilds (guildId TEXT PRIMARY KEY, welcomeChannelId TEXT, logChannelId TEXT, reportChannelId TEXT, verificationRoleId TEXT, autoModEnabled INTEGER DEFAULT 1, bannedWords TEXT DEFAULT '[]', ticketCategoryId TEXT, ticketLogChannelId TEXT, suggestionChannelId TEXT, autoRoleId TEXT, themeColor TEXT DEFAULT '#3498DB', appReviewChannelId TEXT, appQuestions TEXT DEFAULT '[\"What is your name?\", \"How old are you?\", \"Why do you want to join?\"]')")
+        cursor.execute("CREATE TABLE IF NOT EXISTS Guilds (guildId TEXT PRIMARY KEY, welcomeChannelId TEXT, logChannelId TEXT, reportChannelId TEXT, verificationRoleId TEXT, autoModEnabled INTEGER DEFAULT 1, bannedWords TEXT DEFAULT '[]', ticketCategoryId TEXT, ticketLogChannelId TEXT, suggestionChannelId TEXT, autoRoleId TEXT, staffRoleId TEXT, themeColor TEXT DEFAULT '#3498DB', appReviewChannelId TEXT, appQuestions TEXT DEFAULT '[\"What is your name?\", \"How old are you?\", \"Why do you want to join?\"]')")
         cursor.execute("CREATE TABLE IF NOT EXISTS Users (userId TEXT, guildId TEXT, username TEXT, avatar TEXT, xp INTEGER DEFAULT 0, level INTEGER DEFAULT 0, coins INTEGER DEFAULT 0, lastDaily TEXT, lastWork TEXT, PRIMARY KEY (userId, guildId))")
         cursor.execute("CREATE TABLE IF NOT EXISTS AutoResponders (guildId TEXT, trigger TEXT, response TEXT, PRIMARY KEY (guildId, trigger))")
         cursor.execute("CREATE TABLE IF NOT EXISTS Starboard (guildId TEXT PRIMARY KEY, channelId TEXT, threshold INTEGER)")
@@ -39,6 +39,8 @@ class MyBot(commands.Bot):
         cursor.execute("CREATE TABLE IF NOT EXISTS TicketMessages (msgId INTEGER PRIMARY KEY AUTOINCREMENT, ticketId INTEGER, authorId TEXT, authorName TEXT, content TEXT, timestamp TEXT)")
         
         # Add new columns if they don't exist (for existing databases)
+        try: cursor.execute("ALTER TABLE Guilds ADD COLUMN staffRoleId TEXT")
+        except: pass
         try: cursor.execute("ALTER TABLE Users ADD COLUMN username TEXT")
         except: pass
         try: cursor.execute("ALTER TABLE Users ADD COLUMN avatar TEXT")
@@ -113,8 +115,21 @@ class MyBot(commands.Bot):
         
         config = uvicorn.Config(web_app, host=host, port=port, log_level="info")
         server = uvicorn.Server(config)
-        asyncio.create_task(server.serve())
+        
+        # Start uvicorn in a background task
+        loop = asyncio.get_running_loop()
+        server_task = loop.create_task(server.serve())
+        
+        def on_server_exit(task):
+            try:
+                task.result()
+            except Exception as e:
+                print(f"❌ Dashboard Server Error: {e}")
+        
+        server_task.add_done_callback(on_server_exit)
         print(f"🚀 Web Dashboard starting on {host}:{port}")
+        if os.getenv("DISCORD_REDIRECT_URI"):
+            print(f"🔗 Expected Redirect URI: {os.getenv('DISCORD_REDIRECT_URI')}")
 
         # Load Cogs
         cogs_dir = os.path.join(os.getcwd(), "cogs")

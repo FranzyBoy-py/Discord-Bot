@@ -34,6 +34,7 @@ def fix_database():
         all_columns = {
             "welcomeChannelId": "TEXT",
             "logChannelId": "TEXT",
+            "reportChannelId": "TEXT",
             "verificationRoleId": "TEXT",
             "autoModEnabled": "INTEGER DEFAULT 1",
             "bannedWords": "TEXT DEFAULT '[]'",
@@ -41,6 +42,7 @@ def fix_database():
             "ticketLogChannelId": "TEXT",
             "suggestionChannelId": "TEXT",
             "autoRoleId": "TEXT",
+            "staffRoleId": "TEXT",
             "themeColor": "TEXT DEFAULT '#3498DB'",
             "appReviewChannelId": "TEXT",
             "appQuestions": "TEXT DEFAULT '[\"What is your name?\", \"How old are you?\", \"Why do you want to join?\"]'"

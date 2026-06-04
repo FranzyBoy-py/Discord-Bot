@@ -2,12 +2,13 @@ from fastapi import FastAPI, Request, Form, HTTPException, Depends, Cookie
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeTimedSerializer
-import sqlite3, os, httpx, json
+import sqlite3, os, httpx, json, secrets
 from dotenv import load_dotenv
 import math
 
 load_dotenv()
 app = FastAPI()
+app.state.user_cache = {} # Global cache to prevent rate limits
 
 # Use absolute path for templates on WispByte
 template_dir = os.path.join(os.getcwd(), "templates")
@@ -39,8 +40,6 @@ async def resolve_user(bot, user_id, cache):
         return result
     except:
         return f"User {user_id}", "https://cdn.discordapp.com/embed/avatars/0.png"
-
-import secrets
 
 @app.get("/login")
 async def login():
@@ -75,7 +74,6 @@ async def callback(code: str, state: str = None, oauth_state: str = Cookie(None)
         response = RedirectResponse("/")
         data_to_store = {"id": user['id'], "name": user['username'], "avatar": avatar_url, "access_token": token}
         signed_data = s.dumps(data_to_store)
-        # Use samesite='Lax' for basic CSRF protection
         response.set_cookie(key="user_session", value=signed_data, httponly=True, max_age=3600, samesite='lax')
         response.delete_cookie("oauth_state")
         return response
@@ -85,13 +83,12 @@ async def index(request: Request, user_session: str = Cookie(None)):
     bot = getattr(request.app.state, 'bot', None)
     user_data = None
     managed_guilds = {} 
-    user_cache = {} 
     
     if user_session:
         try: 
             user_data = s.loads(user_session, max_age=3600)
             token = user_data.get("access_token")
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get("https://discord.com/api/users/@me/guilds", headers={"Authorization": f"Bearer {token}"})
                 if resp.status_code == 200:
                     for g in resp.json():
@@ -113,36 +110,27 @@ async def index(request: Request, user_session: str = Cookie(None)):
             gid_str = str(g[0])
             if gid_str in managed_guilds:
                 discord_guild = bot.get_guild(int(gid_str)) if bot else None
-                
-                # If bot doesn't have it in cache, try fetching it (might be slow but robust)
-                if not discord_guild and bot:
-                    try:
-                        discord_guild = bot.get_guild(int(gid_str)) # Re-check
-                    except: pass
-                
                 if discord_guild:
-                    # Filter for actual text channels the bot can see
                     channels = [{"id": str(c.id), "name": c.name} for c in discord_guild.text_channels]
                 else:
                     channels = []
-                
                 guilds.append(list(g) + [channels])
 
-
-        # Global Stats & Economy Management
+        # Use app-level cache
+        cache = request.app.state.user_cache
         placeholders = ','.join(['?'] * len(managed_guilds)) if managed_guilds else "''"
         gids = list(managed_guilds.keys()) if managed_guilds else []
         
-        raw_top_users = db.execute(f"SELECT userId, level, xp, coins, username, avatar, guildId FROM Users WHERE guildId IN ({placeholders}) ORDER BY level DESC, xp DESC", gids).fetchall() if gids else []
+        raw_top_users = db.execute(f"SELECT userId, level, xp, coins, username, avatar, guildId FROM Users WHERE guildId IN ({placeholders}) ORDER BY level DESC, xp DESC LIMIT 20", gids).fetchall() if gids else []
         
         top_users = []
         for u in raw_top_users:
             uid, lvl, xp, coins, db_name, db_avatar, gid = u
             if db_name:
                 name, avatar = db_name, db_avatar
-                user_cache[uid] = (name, avatar)
+                cache[uid] = (name, avatar)
             else:
-                name, avatar = await resolve_user(bot, uid, user_cache)
+                name, avatar = await resolve_user(bot, uid, cache)
             top_users.append({
                 "id": uid, "level": lvl or 0, "xp": xp or 0, "coins": coins if coins is not None else 0, 
                 "name": name, "avatar": avatar, "guild_id": gid
@@ -150,25 +138,24 @@ async def index(request: Request, user_session: str = Cookie(None)):
 
         active_giveaways = db.execute("SELECT prize, endTime, guildId FROM Giveaways WHERE active = 1").fetchall()
         
-        tickets_raw = db.execute(f"SELECT * FROM Tickets WHERE guildId IN ({placeholders}) ORDER BY status DESC, openedAt DESC", gids).fetchall() if gids else []
+        tickets_raw = db.execute(f"SELECT * FROM Tickets WHERE guildId IN ({placeholders}) ORDER BY status DESC, openedAt DESC LIMIT 20", gids).fetchall() if gids else []
         tickets = []
         for t in tickets_raw:
-            uname, _ = await resolve_user(bot, t[3], user_cache)
+            uname, _ = await resolve_user(bot, t[3], cache)
             tickets.append(list(t) + [uname])
 
         responders = db.execute(f"SELECT * FROM AutoResponders WHERE guildId IN ({placeholders})", gids).fetchall() if gids else []
-        
-        warnings_raw = db.execute(f"SELECT * FROM Warnings WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC LIMIT 50", gids).fetchall() if gids else []
+        warnings_raw = db.execute(f"SELECT * FROM Warnings WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC LIMIT 20", gids).fetchall() if gids else []
         warnings = []
         for w in warnings_raw:
-            uname, _ = await resolve_user(bot, w[2], user_cache)
-            mname, _ = await resolve_user(bot, w[3], user_cache)
+            uname, _ = await resolve_user(bot, w[2], cache)
+            mname, _ = await resolve_user(bot, w[3], cache)
             warnings.append(list(w) + [uname, mname])
 
-        apps_raw = db.execute(f"SELECT * FROM Applications WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC", gids).fetchall() if gids else []
+        apps_raw = db.execute(f"SELECT * FROM Applications WHERE guildId IN ({placeholders}) ORDER BY timestamp DESC LIMIT 20", gids).fetchall() if gids else []
         apps = []
         for a in apps_raw:
-            uname, _ = await resolve_user(bot, a[2], user_cache)
+            uname, _ = await resolve_user(bot, a[2], cache)
             apps.append(list(a) + [uname])
 
     return templates.TemplateResponse(request=request, name="index.html", context={
@@ -182,29 +169,22 @@ async def index(request: Request, user_session: str = Cookie(None)):
     })
 
 async def verify_admin(guild_id: str, user_session: str):
-    if not user_session:
-        raise HTTPException(status_code=401, detail="Session missing.")
+    if not user_session: return False
     try:
         user_data = s.loads(user_session, max_age=3600)
         token = user_data.get("access_token")
-    except:
-        raise HTTPException(status_code=401, detail="Invalid session.")
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.get("https://discord.com/api/users/@me/guilds", headers={"Authorization": f"Bearer {token}"})
-        if resp.status_code != 200:
-            raise HTTPException(status_code=401, detail="Failed to verify permissions.")
-        
-        for g in resp.json():
-            if g.get("id") == guild_id and (int(g.get("permissions", 0)) & 0x8):
-                return True
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get("https://discord.com/api/users/@me/guilds", headers={"Authorization": f"Bearer {token}"})
+            if resp.status_code != 200: return False
+            for g in resp.json():
+                if g.get("id") == guild_id and (int(g.get("permissions", 0)) & 0x8):
+                    return True
+    except: pass
     return False
 
 @app.post("/action/send")
 async def send_message(guildId: str = Form(...), channelId: str = Form(...), message: str = Form(...), user_session: str = Cookie(None)):
-    if not await verify_admin(guildId, user_session):
-        raise HTTPException(status_code=403, detail="Unauthorized.")
-        
+    if not await verify_admin(guildId, user_session): raise HTTPException(status_code=403)
     bot = app.state.bot
     guild = bot.get_guild(int(guildId))
     if not guild: return {"error": "Guild not found"}
@@ -215,9 +195,7 @@ async def send_message(guildId: str = Form(...), channelId: str = Form(...), mes
 
 @app.post("/responder/add")
 async def add_responder(guildId: str = Form(...), trigger: str = Form(...), response: str = Form(...), user_session: str = Cookie(None)):
-    if not await verify_admin(guildId, user_session):
-        raise HTTPException(status_code=403, detail="Unauthorized.")
-        
+    if not await verify_admin(guildId, user_session): raise HTTPException(status_code=403)
     with get_db() as db:
         db.execute("INSERT OR REPLACE INTO AutoResponders (guildId, trigger, response) VALUES (?, ?, ?)", (guildId, trigger, response))
         db.commit()
@@ -225,37 +203,23 @@ async def add_responder(guildId: str = Form(...), trigger: str = Form(...), resp
 
 @app.post("/responder/delete")
 async def delete_responder(guildId: str = Form(...), trigger: str = Form(...), user_session: str = Cookie(None)):
-    if not await verify_admin(guildId, user_session):
-        raise HTTPException(status_code=403, detail="Unauthorized.")
-        
+    if not await verify_admin(guildId, user_session): raise HTTPException(status_code=403)
     with get_db() as db:
         db.execute("DELETE FROM AutoResponders WHERE guildId = ? AND trigger = ?", (guildId, trigger))
         db.commit()
     return RedirectResponse("/", status_code=303)
 
 @app.post("/economy/update")
-async def update_economy(
-    guildId: str = Form(...), 
-    userId: str = Form(...), 
-    coins: int = Form(...),
-    user_session: str = Cookie(None)
-):
-    if not await verify_admin(guildId, user_session):
-        raise HTTPException(status_code=403, detail="Unauthorized.")
-        
+async def update_economy(guildId: str = Form(...), userId: str = Form(...), coins: int = Form(...), user_session: str = Cookie(None)):
+    if not await verify_admin(guildId, user_session): raise HTTPException(status_code=403)
     with get_db() as db:
-        db.execute(
-            "UPDATE Users SET coins = ? WHERE guildId = ? AND userId = ?", 
-            (coins, guildId, userId)
-        )
+        db.execute("UPDATE Users SET coins = ? WHERE guildId = ? AND userId = ?", (coins, guildId, userId))
         db.commit()
-        
     return RedirectResponse("/", status_code=303)
 
 @app.get("/ticket/{ticket_id}/messages")
 async def get_ticket_messages(ticket_id: int, user_session: str = Cookie(None)):
     if not user_session: raise HTTPException(status_code=403)
-    # Note: Ideally check if user has access to this ticket's guild
     with get_db() as db:
         messages = db.execute("SELECT authorName, content, timestamp FROM TicketMessages WHERE ticketId = ? ORDER BY timestamp ASC", (ticket_id,)).fetchall()
     return [{"author": m[0], "content": m[1], "time": m[2]} for m in messages]
@@ -268,9 +232,7 @@ async def update_settings(
     themeColor: str = Form("#3498DB"), appReviewChannel: str = Form(None), appQuestions: str = Form("[]"), 
     bannedWords: str = Form("[]"), user_session: str = Cookie(None)
 ):
-    if not await verify_admin(guildId, user_session):
-        raise HTTPException(status_code=403, detail="Unauthorized.")
-        
+    if not await verify_admin(guildId, user_session): raise HTTPException(status_code=403)
     def to_json_list(val):
         try:
             parsed = json.loads(val)

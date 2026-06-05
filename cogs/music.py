@@ -186,10 +186,10 @@ class Music(commands.Cog):
         if not current or len(current) < 3:
             return []
 
-        # Use the YouTube suggestions API - it's much faster than yt-dlp
-        url = "http://google.com"
+        # Correct YouTube suggestions API
+        url = "https://suggestqueries.google.com/complete/search"
         params = {
-            "client": "firefox", # Returns a simple JSON list
+            "client": "firefox",
             "ds": "yt",
             "q": current
         }

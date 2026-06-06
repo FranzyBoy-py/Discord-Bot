@@ -3,6 +3,7 @@ fastapi
 uvicorn
 itsdangerous
 httpx
+nest_asyncio
 python-dotenv
 yt-dlp
 google-genai
@@ -10,4 +11,3 @@ jinja2
 aiohttp
 python-multipart
 pyngrok
-nest_asyncio

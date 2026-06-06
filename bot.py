@@ -81,6 +81,61 @@ class MyBot(commands.Bot):
         cursor.execute("INSERT OR IGNORE INTO Guilds (guildId) VALUES (?)", (str(guild_id),))
         self.db.commit()
 
+    async def console_listener(self):
+        await self.wait_until_ready()
+        await asyncio.sleep(2) # Give other logs time to finish
+        print("\n" + "="*50, flush=True)
+        print("FRANZY_BOT REMOTE CONSOLE ACTIVE", flush=True)
+        print("Available Actions:", flush=True)
+        print("  list guilds               - List all joined servers", flush=True)
+        print("  list channels <guild_id>  - List channels in a server", flush=True)
+        print("  send <channel_id> <msg>   - Send message as bot", flush=True)
+        print("="*50 + "\n", flush=True)
+        
+        while True:
+            try:
+                # Use to_thread to prevent blocking the event loop
+                line = await asyncio.to_thread(input, "BOT_CLI > ")
+                if not line or not line.strip(): continue
+                
+                parts = line.split()
+                cmd = parts[0].lower()
+                
+                if cmd == "list" and len(parts) >= 2:
+                    sub = parts[1].lower()
+                    if sub == "guilds":
+                        print(f"\n{'SERVER NAME':<30} | {'GUILD ID':<20}", flush=True)
+                        print("-" * 55, flush=True)
+                        for g in self.guilds:
+                            print(f"{g.name[:30]:<30} | {g.id:<20}", flush=True)
+                        print("", flush=True)
+                    elif sub == "channels" and len(parts) == 3:
+                        gid = int(parts[2])
+                        guild = self.get_guild(gid)
+                        if guild:
+                            print(f"\nChannels for {guild.name}:", flush=True)
+                            for c in guild.text_channels:
+                                print(f"  #{c.name[:25]:<25} | {c.id}", flush=True)
+                            print("", flush=True)
+                        else: print("ERROR: Guild not found.", flush=True)
+                
+                elif cmd == "send" and len(parts) >= 3:
+                    cid = int(parts[1])
+                    msg = " ".join(parts[2:])
+                    channel = self.get_channel(cid)
+                    if channel:
+                        await channel.send(msg)
+                        print(f"SUCCESS: Sent to #{channel.name} in {channel.guild.name}", flush=True)
+                    else: print("ERROR: Channel not found.", flush=True)
+                
+                elif cmd == "help":
+                    print("Commands: list guilds, list channels <id>, send <id> <msg>", flush=True)
+                
+                else:
+                    print(f"UNKNOWN COMMAND: {cmd}. Type 'help' for options.", flush=True)
+            except Exception as e:
+                print(f"CONSOLE EXECUTION ERROR: {e}", flush=True)
+
     async def setup_hook(self):
         # Register Persistent Views
         try:
@@ -127,6 +182,9 @@ class MyBot(commands.Bot):
         # Background task for dashboard
         asyncio.create_task(server.serve())
         print(f"DASHBOARD RUNNING ON {host}:{port}", flush=True)
+
+        # Background task for console
+        asyncio.create_task(self.console_listener())
 
         # Load Cogs
         cogs_dir = os.path.join(os.getcwd(), "cogs")

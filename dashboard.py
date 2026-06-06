@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, Cookie
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, Cookie, Header
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeTimedSerializer
@@ -196,8 +196,23 @@ async def verify_admin(guild_id: str, user_session: str):
     return False
 
 @app.post("/action/send")
-async def send_message(guildId: str = Form(...), channelId: str = Form(...), message: str = Form(...), user_session: str = Cookie(None)):
-    if not await verify_admin(guildId, user_session): raise HTTPException(status_code=403)
+async def send_message(
+    guildId: str = Form(...), 
+    channelId: str = Form(...), 
+    message: str = Form(...), 
+    user_session: str = Cookie(None),
+    x_api_key: str = Header(None, alias="X-API-Key")
+):
+    # Allow access if either valid user session OR valid API Key is provided
+    authorized = False
+    if x_api_key and x_api_key == os.getenv("CONSOLE_API_KEY"):
+        authorized = True
+    elif await verify_admin(guildId, user_session):
+        authorized = True
+
+    if not authorized:
+        raise HTTPException(status_code=403, detail="Unauthorized access")
+
     bot = app.state.bot
     guild = bot.get_guild(int(guildId))
     if not guild: return {"error": "Guild not found"}

@@ -252,6 +252,9 @@
                 <i class="fas fa-chevron-down chevron"></i>
             </div>
             <div class="guild-dropdown" id="guild-dropdown">
+                <div style="padding: 10px; border-bottom: 1px solid var(--border);">
+                    <input type="text" id="guild-search" class="input-dark" placeholder="Search servers..." onkeyup="filterGuilds()" style="padding: 8px 12px; font-size: 12px;">
+                </div>
                 {% for gid, name in managed_guilds.items() %}
                 <div class="guild-option" onclick="selectGuild('{{ gid }}', '{{ name|replace("'", "\\'") }}')">{{ name }}</div>
                 {% endfor %}
@@ -651,6 +654,17 @@
         function closeLog() {
             document.getElementById('modal-log').style.display = 'none';
             clearInterval(poll);
+        }
+
+        function filterGuilds() {
+            const input = document.getElementById('guild-search');
+            const filter = input.value.toLowerCase();
+            const options = document.querySelectorAll('.guild-option');
+            
+            options.forEach(opt => {
+                const text = opt.innerText.toLowerCase();
+                opt.style.display = text.includes(filter) ? 'block' : 'none';
+            });
         }
     </script>
 </body>

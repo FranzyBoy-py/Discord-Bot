@@ -171,8 +171,10 @@ class MyBot(commands.Bot):
 
                 elif cmd == "exit":
                     print("Shutting down...", flush=True)
+                    if hasattr(self, 'web_server'):
+                        self.web_server.should_exit = True
                     await self.close()
-                    sys.exit(0)
+                    return
 
                 else:
                     print(f"UNKNOWN COMMAND: {cmd}. Type 'help' for options.", flush=True)
@@ -220,10 +222,10 @@ class MyBot(commands.Bot):
                 print(f"NGROK ERROR: {e}", flush=True)
         
         config = uvicorn.Config(web_app, host=host, port=port, log_level="info")
-        server = uvicorn.Server(config)
+        self.web_server = uvicorn.Server(config)
         
         # Background task for dashboard
-        asyncio.create_task(server.serve())
+        asyncio.create_task(self.web_server.serve())
         print(f"DASHBOARD RUNNING ON {host}:{port}", flush=True)
 
         # Background task for console
@@ -257,6 +259,9 @@ async def sync(ctx):
 if __name__ == "__main__":
     token = os.getenv("DISCORD_TOKEN")
     if token:
-        bot.run(token)
+        try:
+            bot.run(token)
+        except KeyboardInterrupt:
+            pass
     else:
         print("MISSING DISCORD_TOKEN", flush=True)

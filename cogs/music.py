@@ -8,7 +8,7 @@ import re
 import aiohttp
 import random
 
-# Improved yt-dlp configuration for high quality and speed
+# Advanced yt-dlp configuration to bypass bot detection
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
@@ -21,13 +21,16 @@ ytdl_format_options = {
     'no_warnings': True,
     'default_search': 'auto',
     'source_address': '0.0.0.0',
-    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'headers': {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"Windows"',
+    },
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['ios', 'android', 'web_safari'],
+            'player_skip': ['webpage', 'configs'],
+        }
     }
 }
 
@@ -37,13 +40,20 @@ ffmpeg_options = {
 }
 
 ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
+# Faster instance for autocomplete
+search_ytdl = yt_dlp.YoutubeDL({
+    'quiet': True, 
+    'extract_flat': True, 
+    'max_entries': 10,
+    'source_address': '0.0.0.0',
+})
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
         self.data = data
         title = data.get('title', 'Unknown')
-        uploader = data.get('uploader', 'Unknown Artist')
+        uploader = data.get('channel', data.get('uploader', 'Unknown Artist'))
         self.display_name = f"{title} - {uploader}"
         self.url = data.get('url')
         self.webpage_url = data.get('webpage_url')
@@ -276,14 +286,32 @@ class Music(commands.Cog):
     async def play_autocomplete(self, interaction: discord.Interaction, current: str):
         if not current: return []
         
+        try:
+            # Fast extraction for suggestions
+            info = await self.bot.loop.run_in_executor(None, lambda: search_ytdl.extract_info(f"ytsearch5:{current}", download=False))
+            if 'entries' in info:
+                choices = []
+                for entry in info['entries']:
+                    title = entry.get('title', 'Unknown')
+                    uploader = entry.get('channel', entry.get('uploader', 'Unknown Artist'))
+                    name = f"{title} - {uploader}"[:100]
+                    # We store the URL as the value so the play command doesn't have to search again
+                    choices.append(app_commands.Choice(name=name, value=entry.get('url', name)))
+                return choices
+        except Exception as e:
+            print(f"Autocomplete Search Error: {e}")
+            
+        # Fallback to Google suggestions if YouTube search fails
         url = "https://suggestqueries.google.com/complete/search"
         params = {"client": "firefox", "ds": "yt", "q": current}
         
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as resp:
-                if resp.status == 200:
-                    data = await resp.json(content_type=None)
-                    return [app_commands.Choice(name=s[:100], value=s) for s in data[1][:25]]
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as resp:
+                    if resp.status == 200:
+                        data = await resp.json(content_type=None)
+                        return [app_commands.Choice(name=s[:100], value=s) for s in data[1][:25]]
+        except: pass
         return []
 
     @app_commands.command(name="skip", description="⏭️ Skip the current song.")

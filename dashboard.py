@@ -76,7 +76,7 @@ async def callback(code: str, state: str = None, oauth_state: str = Cookie(None)
         
         user_resp = await client.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {token}"})
         user = user_resp.json()
-        avatar_url = f"https://cdn.discordavatars.com/avatars/{user['id']}/{user['avatar']}.png" if user.get('avatar') else "https://cdn.discordapp.com/embed/avatars/0.png"
+        avatar_url = f"https://cdn.discordapp.com/avatars/{user['id']}/{user['avatar']}.png" if user.get('avatar') else "https://cdn.discordapp.com/embed/avatars/0.png"
         
         response = RedirectResponse("/dashboard")
         data_to_store = {"id": user['id'], "name": user['username'], "avatar": avatar_url, "access_token": token}

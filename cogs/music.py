@@ -297,33 +297,29 @@ class Music(commands.Cog):
     async def play_autocomplete(self, interaction: discord.Interaction, current: str):
         if not current: return []
         
-        try:
-            # Fast extraction for suggestions
-            info = await self.bot.loop.run_in_executor(None, lambda: search_ytdl.extract_info(f"ytsearch5:{current}", download=False))
-            if 'entries' in info:
-                choices = []
-                for entry in info['entries']:
-                    title = entry.get('title', 'Unknown')
-                    uploader = entry.get('channel', entry.get('uploader', 'Unknown Artist'))
-                    name = f"{title} - {uploader}"[:100]
-                    # We store the URL as the value so the play command doesn't have to search again
-                    choices.append(app_commands.Choice(name=name, value=entry.get('url', name)))
-                return choices
-        except Exception as e:
-            print(f"Autocomplete Search Error: {e}")
-            
-        # Fallback to Google suggestions if YouTube search fails
-        url = "https://suggestqueries.google.com/complete/search"
-        params = {"client": "firefox", "ds": "yt", "q": current}
+        # We only have 3 seconds to respond to autocomplete. 
+        # YouTube searching via yt-dlp is powerful but can be slow.
+        # We'll try a very fast Google suggestion fetch first as it's nearly instant.
         
+        choices = []
         try:
+            # 1. Try Google Suggestions (Super Fast Fallback)
+            url = "https://suggestqueries.google.com/complete/search"
+            params = {"client": "firefox", "ds": "yt", "q": current}
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params) as resp:
+                async with session.get(url, params=params, timeout=1.0) as resp:
                     if resp.status == 200:
                         data = await resp.json(content_type=None)
-                        return [app_commands.Choice(name=s[:100], value=s) for s in data[1][:25]]
-        except: pass
-        return []
+                        for s in data[1][:10]:
+                            choices.append(app_commands.Choice(name=s[:100], value=s))
+        except:
+            pass
+
+        # 2. If we have time/resources, we could try yt-dlp, but to avoid 404s,
+        # we'll stick to the fast suggestions for now or return what we have.
+        # Unknown interaction (10062) means we took > 3s.
+        
+        return choices[:25]
 
     @app_commands.command(name="skip", description="⏭️ Skip the current song.")
     async def skip(self, interaction: discord.Interaction):

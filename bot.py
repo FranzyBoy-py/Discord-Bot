@@ -2,7 +2,6 @@ import discord
 import os
 import sqlite3
 import asyncio
-import nest_asyncio
 import sys
 from discord import app_commands
 from discord.ext import commands
@@ -11,8 +10,6 @@ import uvicorn
 from pyngrok import ngrok
 from dashboard import app as web_app
 
-# Apply nest_asyncio to allow nested event loops (required for uvicorn + discord.py)
-nest_asyncio.apply()
 load_dotenv()
 
 class MyBot(commands.Bot):

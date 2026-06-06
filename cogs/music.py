@@ -28,7 +28,7 @@ ytdl_format_options = {
     },
     'extractor_args': {
         'youtube': {
-            'player_client': ['ios', 'android', 'web_safari'],
+            'player_client': ['ios', 'android', 'web_music', 'web_safari'],
             'player_skip': ['webpage', 'configs'],
         }
     }
@@ -56,7 +56,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
         uploader = data.get('channel', data.get('uploader', 'Unknown Artist'))
         self.display_name = f"{title} - {uploader}"
         self.url = data.get('url')
-        self.webpage_url = data.get('webpage_url')
+        self.webpage_url = data.get('webpage_url') or data.get('url')
         self.thumbnail = data.get('thumbnail')
         self.duration = data.get('duration')
         self.duration_str = self.parse_duration(self.duration)
@@ -72,7 +72,11 @@ class YTDLSource(discord.PCMVolumeTransformer):
     async def from_url(cls, url, *, loop=None, stream=False):
         loop = loop or asyncio.get_event_loop()
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-        if 'entries' in data: data = data['entries'][0]
+        
+        # If it's a search/playlist, take the first entry
+        if 'entries' in data:
+            data = data['entries'][0]
+
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
@@ -257,12 +261,19 @@ class Music(commands.Cog):
             # Fast extraction
             info = await self.bot.loop.run_in_executor(None, lambda: ytdl.extract_info(query, download=False, process=True))
             
-            if not info or 'entries' not in info or not info['entries']:
+            if not info:
                 return await interaction.followup.send("❌ No results found.")
             
-            entry = info['entries'][0]
+            # Handle both search results and direct URLs
+            if 'entries' in info:
+                if not info['entries']:
+                    return await interaction.followup.send("❌ No results found.")
+                entry = info['entries'][0]
+            else:
+                entry = info
+
             title = entry.get('title', 'Unknown')
-            uploader = entry.get('uploader', 'Unknown Artist')
+            uploader = entry.get('channel', entry.get('uploader', 'Unknown Artist'))
             
             song_data = {
                 'title': f"{title} - {uploader}",

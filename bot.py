@@ -80,25 +80,58 @@ class MyBot(commands.Bot):
 
     async def console_listener(self):
         await self.wait_until_ready()
-        await asyncio.sleep(2) # Give other logs time to finish
+        await asyncio.sleep(2)
         print("\n" + "="*50, flush=True)
         print("FRANZY_BOT REMOTE CONSOLE ACTIVE", flush=True)
-        print("Available Actions:", flush=True)
-        print("  list guilds               - List all joined servers", flush=True)
-        print("  list channels <guild_id>  - List channels in a server", flush=True)
-        print("  send <channel_id> <msg>   - Send message as bot", flush=True)
+        print("Type 'help' to see all available commands.", flush=True)
         print("="*50 + "\n", flush=True)
         
         while True:
             try:
-                # Use to_thread to prevent blocking the event loop
                 line = await asyncio.to_thread(input, "BOT_CLI > ")
                 if not line or not line.strip(): continue
                 
                 parts = line.split()
                 cmd = parts[0].lower()
                 
-                if cmd == "list" and len(parts) >= 2:
+                if cmd == "help":
+                    print("\n--- AVAILABLE CONSOLE COMMANDS ---", flush=True)
+                    print("  list guilds               - Show all servers bot is in", flush=True)
+                    print("  list channels <guild_id>  - Show text channels in a server", flush=True)
+                    print("  send <channel_id> <msg>   - Send a message as the bot", flush=True)
+                    print("  stats                     - Show bot performance & system stats", flush=True)
+                    print("  presence <type> <text>    - Change bot status (playing, watching, listening)", flush=True)
+                    print("  cogs                      - List all loaded/unloaded cogs", flush=True)
+                    print("  sync                      - Force sync global slash commands", flush=True)
+                    print("  exit                      - Safely shut down the bot", flush=True)
+                    print("----------------------------------\n", flush=True)
+
+                elif cmd == "stats":
+                    import psutil
+                    process = psutil.Process(os.getpid())
+                    mem = process.memory_info().rss / 1024 / 1024
+                    print(f"\n--- BOT STATISTICS ---", flush=True)
+                    print(f"  Latency:    {round(self.latency * 1000)}ms", flush=True)
+                    print(f"  Guilds:     {len(self.guilds)}", flush=True)
+                    print(f"  Users:      {len(self.users)}", flush=True)
+                    print(f"  Memory:     {mem:.2f} MB", flush=True)
+                    print(f"  Python:     {sys.version.split()[0]}", flush=True)
+                    print(f"----------------------\n", flush=True)
+
+                elif cmd == "presence" and len(parts) >= 3:
+                    p_type = parts[1].lower()
+                    p_text = " ".join(parts[2:])
+                    activity = None
+                    if p_type == "playing": activity = discord.Game(name=p_text)
+                    elif p_type == "watching": activity = discord.Activity(type=discord.ActivityType.watching, name=p_text)
+                    elif p_type == "listening": activity = discord.Activity(type=discord.ActivityType.listening, name=p_text)
+                    
+                    if activity:
+                        await self.change_presence(activity=activity)
+                        print(f"SUCCESS: Presence updated to {p_type} {p_text}", flush=True)
+                    else: print("ERROR: Invalid type. Use: playing, watching, listening", flush=True)
+
+                elif cmd == "list" and len(parts) >= 2:
                     sub = parts[1].lower()
                     if sub == "guilds":
                         print(f"\n{'SERVER NAME':<30} | {'GUILD ID':<20}", flush=True)
@@ -115,7 +148,18 @@ class MyBot(commands.Bot):
                                 print(f"  #{c.name[:25]:<25} | {c.id}", flush=True)
                             print("", flush=True)
                         else: print("ERROR: Guild not found.", flush=True)
-                
+
+                elif cmd == "cogs":
+                    print("\n--- LOADED COGS ---", flush=True)
+                    for cog in self.cogs:
+                        print(f"  [+] {cog}", flush=True)
+                    print("-------------------\n", flush=True)
+
+                elif cmd == "sync":
+                    print("Syncing global commands...", flush=True)
+                    synced = await self.tree.sync()
+                    print(f"SUCCESS: Synced {len(synced)} commands globally.", flush=True)
+
                 elif cmd == "send" and len(parts) >= 3:
                     cid = int(parts[1])
                     msg = " ".join(parts[2:])
@@ -124,10 +168,12 @@ class MyBot(commands.Bot):
                         await channel.send(msg)
                         print(f"SUCCESS: Sent to #{channel.name} in {channel.guild.name}", flush=True)
                     else: print("ERROR: Channel not found.", flush=True)
-                
-                elif cmd == "help":
-                    print("Commands: list guilds, list channels <id>, send <id> <msg>", flush=True)
-                
+
+                elif cmd == "exit":
+                    print("Shutting down...", flush=True)
+                    await self.close()
+                    sys.exit(0)
+
                 else:
                     print(f"UNKNOWN COMMAND: {cmd}. Type 'help' for options.", flush=True)
             except Exception as e:

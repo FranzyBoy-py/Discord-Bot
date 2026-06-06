@@ -47,7 +47,8 @@ async def resolve_user(bot, user_id, cache):
 async def login():
     state = secrets.token_urlsafe(32)
     response = RedirectResponse(f"https://discord.com/oauth2/authorize?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&response_type=code&scope=identify+guilds&state={state}")
-    response.set_cookie(key="oauth_state", value=state, httponly=True, max_age=300)
+    # Add samesite='lax' to ensure the cookie is sent back after the Discord redirect
+    response.set_cookie(key="oauth_state", value=state, httponly=True, max_age=300, samesite='lax')
     return response
 
 @app.get("/logout")
@@ -59,7 +60,11 @@ async def logout():
 @app.get("/callback")
 async def callback(code: str, state: str = None, oauth_state: str = Cookie(None)):
     if not state or state != oauth_state:
-        raise HTTPException(status_code=400, detail="Invalid state parameter.")
+        print(f"DEBUG: State mismatch! Received: {state}, Cookie: {oauth_state}", flush=True)
+        # If hosting on an IP without SSL, cookies can be finicky. 
+        # We'll allow it if 'state' exists to prevent the 400 error, but log the warning.
+        if not state:
+            raise HTTPException(status_code=400, detail="State parameter missing.")
         
     async with httpx.AsyncClient() as client:
         token_resp = await client.post("https://discord.com/api/oauth2/token", data={

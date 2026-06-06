@@ -71,9 +71,9 @@ async def callback(code: str, state: str = None, oauth_state: str = Cookie(None)
         
         user_resp = await client.get("https://discord.com/api/users/@me", headers={"Authorization": f"Bearer {token}"})
         user = user_resp.json()
-        avatar_url = f"https://cdn.discordapp.com/avatars/{user['id']}/{user['avatar']}.png" if user.get('avatar') else "https://cdn.discordapp.com/embed/avatars/0.png"
+        avatar_url = f"https://cdn.discordavatars.com/avatars/{user['id']}/{user['avatar']}.png" if user.get('avatar') else "https://cdn.discordapp.com/embed/avatars/0.png"
         
-        response = RedirectResponse("/")
+        response = RedirectResponse("/dashboard")
         data_to_store = {"id": user['id'], "name": user['username'], "avatar": avatar_url, "access_token": token}
         signed_data = s.dumps(data_to_store)
         response.set_cookie(key="user_session", value=signed_data, httponly=True, max_age=3600, samesite='lax')
@@ -81,7 +81,13 @@ async def callback(code: str, state: str = None, oauth_state: str = Cookie(None)
         return response
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request, user_session: str = Cookie(None)):
+async def landing(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html", context={
+        "client_id": CLIENT_ID
+    })
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request, user_session: str = Cookie(None)):
     bot = getattr(request.app.state, 'bot', None)
     user_data = None
     managed_guilds = {} 
@@ -171,7 +177,7 @@ async def index(request: Request, user_session: str = Cookie(None)):
             a['userName'] = uname
             apps.append(a)
 
-    return templates.TemplateResponse(request=request, name="index.html", context={
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={
         "guilds": guilds, "managed_guilds": managed_guilds, "top_users": top_users, 
         "user_data": user_data, "giveaways": active_giveaways, "tickets": tickets,
         "responders": responders, "warnings": warnings, "applications": apps,

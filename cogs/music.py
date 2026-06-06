@@ -183,7 +183,7 @@ class Music(commands.Cog):
             print(f"Music Cog Error: {error}")
 
     async def yt_autocomplete(self, interaction: discord.Interaction, current: str):
-        if not current or len(current) < 3:
+        if not current:
             return []
 
         # Correct YouTube suggestions API

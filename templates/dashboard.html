@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Franzy_Bot | Elite Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #000000;
+            --surface: #08080a;
+            --surface-bright: #111114;
+            --accent: #00f2ff;
+            --accent-dim: rgba(0, 242, 255, 0.1);
+            --text: #ffffff;
+            --text-dim: #6b6b72;
+            --border: rgba(255, 255, 255, 0.05);
+            --success: #10b981;
+            --danger: #f43f5e;
+            --sidebar-width: 280px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            position: fixed;
+            left: 0; top: 0; bottom: 0;
+            width: var(--sidebar-width);
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 40px 24px;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+
+        /* Mobile Menu Toggle */
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 2000;
+            background: var(--surface-bright);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            display: flex;
+            align-items: center; gap: 12px;
+            margin-bottom: 32px;
+            color: var(--text);
+            text-decoration: none;
+        }
+        .logo i { color: var(--accent); }
+
+        /* Guild Selector */
+        .guild-selector {
+            background: var(--surface-bright);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 12px;
+            margin-bottom: 32px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .guild-selector:hover { border-color: var(--accent); }
+        .guild-selector .current-guild { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 13px; }
+        .guild-selector i.chevron { margin-left: auto; font-size: 10px; color: var(--text-dim); }
+
+        .guild-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0; right: 0;
+            background: var(--surface-bright);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 2000;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        .guild-dropdown.show { display: flex; }
+        .guild-option { padding: 12px 16px; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 1px solid var(--border); }
+        .guild-option:hover { background: var(--accent-dim); color: var(--accent); }
+
+        .nav-label { font-size: 10px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin: 24px 0 12px 12px; }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: var(--text-dim);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 13px;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            width: 100%;
+            text-align: left;
+            margin-bottom: 4px;
+        }
+        .nav-item:hover, .nav-item.active { color: var(--text); background: var(--accent-dim); }
+        .nav-item.active { color: var(--accent); }
+
+        /* Main Content */
+        .main { margin-left: var(--sidebar-width); padding: 48px 60px; min-height: 100vh; transition: margin 0.3s ease; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 48px; gap: 20px; }
+        .header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -1px; }
+
+        .user-pill {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--surface);
+            padding: 6px 16px;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+            position: relative;
+            flex-shrink: 0;
+        }
+        .user-pill img { width: 32px; height: 32px; border-radius: 50%; }
+        .user-pill span { font-weight: 700; font-size: 13px; }
+        .logout-btn { 
+            position: absolute; 
+            top: calc(100% + 8px); 
+            right: 0; 
+            background: var(--surface-bright); 
+            border: 1px solid var(--border);
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--danger);
+            text-decoration: none;
+            white-space: nowrap;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .user-pill:hover .logout-btn { 
+            opacity: 1; 
+            visibility: visible;
+        }
+
+        /* Cards & UI */
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 32px; margin-bottom: 32px; overflow: hidden; }
+        .card-title { font-size: 1.25rem; font-weight: 800; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+        
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 40px; }
+        .stat-val { font-size: 2.5rem; font-weight: 800; color: var(--accent); }
+        .stat-label { font-size: 11px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; margin-top: 4px; }
+
+        /* View Panes */
+        .view-pane { display: none; }
+        .view-pane.active { display: block; animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        .field { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+        .field label { font-size: 11px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; }
+        
+        .input-dark {
+            background: #000;
+            border: 1px solid var(--border);
+            color: white;
+            padding: 16px;
+            border-radius: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        .input-dark:focus { border-color: var(--accent); }
+
+        .btn { padding: 14px 28px; border-radius: 14px; font-weight: 800; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 10px; font-family: inherit; }
+        .btn-accent { background: var(--accent); color: #000; }
+        .btn-accent:hover { filter: brightness(1.1); transform: translateY(-2px); }
+
+        /* Table */
+        .table-wrap-container { overflow-x: auto; width: 100%; }
+        .table-wrap { width: 100%; border-collapse: collapse; min-width: 600px; }
+        .table-wrap th { text-align: left; padding: 20px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        .table-wrap td { padding: 20px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; }
+
+        /* Modal */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(10px); }
+        .modal-inner { background: var(--surface); width: 95%; max-width: 800px; height: 80vh; border-radius: 32px; border: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+        .modal-header { padding: 24px 32px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { flex: 1; overflow-y: auto; padding: 32px; display: flex; flex-direction: column; gap: 20px; }
+
+        #toast { position: fixed; top: 40px; right: 40px; background: var(--surface-bright); border: 1px solid var(--accent); padding: 16px 32px; border-radius: 20px; color: white; font-weight: 800; transform: translateX(200%); transition: transform 0.4s; z-index: 5000; }
+        #toast.show { transform: translateX(0); }
+
+        .lock-overlay { text-align: center; padding: 100px; color: var(--text-dim); font-weight: 800; }
+
+        /* Mobile Specific Styles */
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .main { margin-left: 0; padding: 80px 24px 24px; }
+            .mobile-toggle { display: block; }
+            .header h1 { font-size: 1.5rem; }
+            .user-pill span { display: none; }
+            .grid-3 { grid-template-columns: 1fr; }
+            .card { padding: 24px; }
+            .modal-inner { height: 90vh; width: 100%; border-radius: 0; }
+        }
+    </style>
+</head>
+<body onclick="closeSidebarIfOpen(event)">
+    <div id="toast">SYSTEM SYNCED</div>
+
+    <button class="mobile-toggle" onclick="toggleSidebar(event)">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <aside class="sidebar" id="sidebar">
+        <a href="/" class="logo">
+            <i class="fas fa-microchip"></i>
+            <span>FRANZY<span>_BOT</span></span>
+        </a>
+
+        {% if user_data and managed_guilds %}
+        <div class="guild-selector" onclick="toggleDropdown()">
+            <div class="current-guild" id="current-guild-display">
+                <i class="fas fa-server" style="color: var(--accent);"></i>
+                <span>SELECT SERVER</span>
+                <i class="fas fa-chevron-down chevron"></i>
+            </div>
+            <div class="guild-dropdown" id="guild-dropdown">
+                <div style="padding: 10px; border-bottom: 1px solid var(--border);">
+                    <input type="text" id="guild-search" class="input-dark" placeholder="Search servers..." onkeyup="filterGuilds()" style="padding: 8px 12px; font-size: 12px;">
+                </div>
+                {% for gid, name in managed_guilds.items() %}
+                <div class="guild-option" onclick="selectGuild('{{ gid }}', '{{ name|replace("'", "\\'") }}')">{{ name }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="nav-label">COMMAND</div>
+        <button class="nav-item active" onclick="setTab(event, 'v-dash')"><i class="fas fa-th-large"></i> OVERVIEW</button>
+        <button class="nav-item" onclick="setTab(event, 'v-control')"><i class="fas fa-terminal"></i> QUICK ACTIONS</button>
+        <button class="nav-item" onclick="setTab(event, 'v-settings')"><i class="fas fa-sliders-h"></i> CONFIGURATION</button>
+
+        <div class="nav-label">SYSTEMS</div>
+        <button class="nav-item" onclick="setTab(event, 'v-tickets')"><i class="fas fa-ticket-alt"></i> TICKETS</button>
+        <button class="nav-item" onclick="setTab(event, 'v-economy')"><i class="fas fa-coins"></i> ECONOMY</button>
+        <button class="nav-item" onclick="setTab(event, 'v-logs')"><i class="fas fa-history"></i> AUDIT LOGS</button>
+        <button class="nav-item" onclick="setTab(event, 'v-apps')"><i class="fas fa-file-contract"></i> APPLICATIONS</button>
+        <button class="nav-item" onclick="setTab(event, 'v-responders')"><i class="fas fa-bolt"></i> TRIGGERS</button>
+    </aside>
+
+    <main class="main">
+        <div class="header">
+            <h1 id="view-title">Overview</h1>
+            {% if user_data %}
+            <div class="user-pill">
+                <img src="{{ user_data.avatar }}">
+                <span>{{ user_data.name }}</span>
+                <a href="/logout" class="logout-btn"><i class="fas fa-sign-out-alt"></i> LOGOUT</a>
+            </div>
+            {% else %}
+            <a href="/login" class="btn btn-accent">LOGIN WITH DISCORD</a>
+            {% endif %}
+        </div>
+
+        {% if not user_data %}
+        <div class="card" style="text-align:center; padding: 120px 0;">
+            <i class="fas fa-lock" style="font-size: 64px; color: var(--accent); margin-bottom: 24px; opacity: 0.5;"></i>
+            <h2>ENCRYPTED CHANNEL</h2>
+            <p style="color: var(--text-dim); margin-top: 12px; margin-bottom: 32px;">Please authenticate to access the obsidian control panel.</p>
+            <a href="/login" class="btn btn-accent">LOGIN WITH DISCORD</a>
+        </div>
+        {% elif not managed_guilds %}
+        <div class="card" style="text-align:center; padding: 120px 0;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 64px; color: var(--danger); margin-bottom: 24px; opacity: 0.5;"></i>
+            <h2>ACCESS DENIED</h2>
+            <p style="color: var(--text-dim); margin-top: 12px;">You must be an **Administrator** in a server where Franzy_Bot is present.</p>
+        </div>
+        {% else %}
+
+        <div id="v-dash" class="view-pane active">
+            <div class="grid-3">
+                <div class="card"><div class="stat-val">{{ bot_stats.latency }}ms</div><p class="stat-label">Network Ping</p></div>
+                <div class="card"><div class="stat-val">{{ managed_guilds|length }}</div><p class="stat-label">Authorized Servers</p></div>
+                <div class="card"><div class="stat-val">{{ tickets|selectattr('status', 'equalto', 'Open')|list|length }}</div><p class="stat-label">Active Tickets</p></div>
+            </div>
+            <div class="card" style="padding:0; overflow:hidden;">
+                <div style="padding:32px 32px 0;"><h3 class="card-title"><i class="fas fa-crown"></i> GLOBAL LEADERBOARD</h3></div>
+                <div class="table-wrap-container">
+                    <table class="table-wrap">
+                        <thead><tr><th>MEMBER</th><th>LEVEL</th><th>CREDITS</th></tr></thead>
+                        <tbody>
+                            {% for u in top_users %}
+                            <tr>
+                                <td style="display:flex; align-items:center; gap:12px;"><img src="{{ u.avatar }}" style="width:32px; height:32px; border-radius:10px;"> {{ u.name }}</td>
+                                <td><span style="color:var(--accent)">LVL {{ u.level }}</span></td>
+                                <td style="color:var(--success)">💰 {{ u.coins }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SHARED LOCK MESSAGE -->
+        <div id="guild-lock" class="lock-overlay" style="display:block;">
+            <i class="fas fa-shield-halved" style="font-size:48px; margin-bottom:20px; opacity:0.3;"></i><br>
+            PLEASE SELECT A SERVER FROM THE SIDEBAR TO VIEW THIS MODULE
+        </div>
+
+        <div id="v-control" class="view-pane guild-required">
+            {% for g in guilds %}
+            <div class="guild-specific-view gid-{{ g.guildId }}" style="display:none;">
+                <div class="card">
+                    <h3 class="card-title">Broadcast Module</h3>
+                    <div class="field">
+                        <label>Target Channel</label>
+                        <select id="chan-{{ g.guildId }}" class="input-dark">
+                            {% for c in (g.channels if g.channels is not none else []) %}
+                            <option value="{{ c.id }}"># {{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field"><label>Message Content</label><textarea id="msg-{{ g.guildId }}" class="input-dark" rows="3"></textarea></div>
+                    <button class="btn btn-accent" onclick="sendMsg('{{ g.guildId }}')">EXECUTE BROADCAST</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="v-settings" class="view-pane guild-required">
+            {% for g in guilds %}
+            <div class="guild-specific-view gid-{{ g.guildId }}" style="display:none;">
+                <div class="card">
+                    <h3 class="card-title">Server Parameters</h3>
+                    <form onsubmit="saveSync(event, this)">
+                        <input type="hidden" name="guildId" value="{{ g.guildId }}">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
+                            <div class="field"><label>Welcome Node</label><input type="text" name="welcomeChannel" value="{{ g.welcomeChannelId or '' }}" class="input-dark"></div>
+                            <div class="field"><label>Audit Feed</label><input type="text" name="logChannel" value="{{ g.logChannelId or '' }}" class="input-dark"></div>
+                            <div class="field"><label>Staff Reviews</label><input type="text" name="appReviewChannel" value="{{ g.appReviewChannelId or '' }}" class="input-dark"></div>
+                            <div class="field"><label>Staff Role ID</label><input type="text" name="staffRole" value="{{ g.staffRoleId or '' }}" class="input-dark" placeholder="Role ID for tickets"></div>
+                            <div class="field"><label>UI Accent</label><input type="color" name="themeColor" value="{{ g.themeColor or '#3498DB' }}" style="height:54px; width:100%; border-radius:14px; background:#000; border:1px solid var(--border); padding:5px;"></div>
+                        </div>
+                        <button type="submit" class="btn btn-accent" style="width:100%; margin-top:24px;">SYNC CLOUD STORAGE</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="v-tickets" class="view-pane guild-required">
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:24px;">
+                {% for t in tickets %}
+                <div class="card item-card gid-{{ t.guildId }}" style="display:none;" onclick="openT({{ t.ticketId }}, '{{ t.userName|replace("'", "\\'") }}')">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <span style="font-size:11px; font-weight:800; color:{% if t.status=='Open' %}var(--success){% else %}var(--text-dim){% endif %};">{{ t.status|upper }}</span>
+                        <span style="font-family:monospace; font-size:10px; opacity:0.5;">#{{ t.ticketId }}</span>
+                    </div>
+                    <p style="font-weight:800; font-size:15px; margin-bottom:4px;">{{ t.userName }}</p>
+                    <p style="font-size:12px; color:var(--text-dim);">Reason: {{ t.reason or 'N/A' }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="v-economy" class="view-pane guild-required">
+            <div class="card" style="padding:0; overflow:hidden;">
+                <div class="table-wrap-container">
+                    <table class="table-wrap">
+                        <thead><tr><th>MEMBER</th><th>BALANCE</th><th>ACTION</th></tr></thead>
+                        <tbody>
+                            {% for u in top_users %}
+                            <tr class="guild-specific-view gid-{{ u.guildId }}" style="display:none;">
+                                <td style="display:flex; align-items:center; gap:12px;">
+                                    <img src="{{ u.avatar }}" style="width:32px; height:32px; border-radius:10px;">
+                                    {{ u.name }}
+                                </td>
+                                <td><input type="number" name="coins" id="eco-{{ u.guildId }}-{{ u.userId }}" value="{{ u.coins }}" class="input-dark" style="padding:8px 12px; border-radius:10px; width:140px;"></td>
+                                <td><button class="btn btn-accent" style="padding:8px 16px; font-size:11px;" onclick="upEco('{{ u.userId }}', '{{ u.guildId }}')">UPDATE</button></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="v-logs" class="view-pane guild-required">
+            <div class="card" style="padding:0; overflow:hidden;">
+                <div class="table-wrap-container">
+                    <table class="table-wrap">
+                        <thead><tr><th>TARGET</th><th>MODERATOR</th><th>REASON</th><th>TIME</th></tr></thead>
+                        <tbody>
+                            {% for w in warnings %}
+                            <tr class="guild-specific-view gid-{{ w.guildId }}" style="display:none;">
+                                <td><b>{{ w.userName }}</b></td>
+                                <td>{{ w.modName }}</td>
+                                <td>{{ w.reason }}</td>
+                                <td style="font-size:11px; color:var(--text-dim);">{{ w.timestamp[:16].replace('T', ' ') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="v-apps" class="view-pane guild-required">
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:24px;">
+                {% for a in applications %}
+                <div class="card gid-{{ a.guildId }} guild-specific-view" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <span class="badge" style="background:var(--accent-dim); color:var(--accent);">{{ a.status|upper }}</span>
+                        <span style="font-family:monospace; font-size:10px; opacity:0.5;">#{{ a.appId }}</span>
+                    </div>
+                    <p style="font-weight:800;">{{ a.userName }}</p>
+                    <p style="font-size:12px; color:var(--text-dim); margin-top:8px;">Submitted: {{ a.timestamp[:16].replace('T', ' ') }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="v-responders" class="view-pane guild-required">
+            <div class="card" id="responder-form-card">
+                <h3 class="card-title">Initialize Neural Trigger</h3>
+                <form onsubmit="addTrigger(event, this)">
+                    <input type="hidden" name="guildId" id="responder-gid-hidden">
+                    <div class="field"><label>Input Pattern (Trigger)</label><input type="text" name="trigger" class="input-dark" placeholder="!command" required></div>
+                    <div class="field"><label>Automated Response</label><textarea name="response" class="input-dark" rows="3" required></textarea></div>
+                    <button type="submit" class="btn btn-accent">COMMENCE INITIALIZATION</button>
+                </form>
+            </div>
+            <div class="card" style="padding:0; overflow:hidden;">
+                <div class="table-wrap-container">
+                    <table class="table-wrap">
+                        <thead><tr><th>TRIGGER</th><th>RESPONSE</th><th>ACTION</th></tr></thead>
+                        <tbody id="responder-table-body">
+                            {% for r in responders %}
+                            <tr class="guild-specific-view gid-{{ r.guildId }}" style="display:none;">
+                                <td style="color:var(--accent);"><b>{{ r.trigger }}</b></td>
+                                <td style="font-size:12px;">{{ r.response[:60] }}...</td>
+                                <td>
+                                    <button type="button" class="btn btn-danger" style="padding:8px;" onclick="delTrigger('{{ r.guildId }}', '{{ r.trigger|replace("'", "\\'") }}', this.parentElement.parentElement)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {% endif %}
+    </main>
+
+    <div class="modal" id="modal-log">
+        <div class="modal-inner">
+            <div class="modal-header">
+                <h3 id="modal-title">TRANSCRIPT</h3>
+                <button onclick="closeLog()" style="background:none; border:none; color:white; font-size:32px; cursor:pointer;">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedGid = null;
+        let poll = null;
+
+        function toggleDropdown() { document.getElementById('guild-dropdown').classList.toggle('show'); }
+
+        function selectGuild(id, name) {
+            selectedGid = id;
+            document.getElementById('current-guild-display').querySelector('span').innerText = name;
+            document.getElementById('guild-dropdown').classList.remove('show');
+            document.getElementById('guild-lock').style.display = 'none';
+            
+            // Show all elements matching this guild, hide others
+            document.querySelectorAll('.guild-specific-view, .item-card').forEach(el => {
+                const isMatch = el.classList.contains(`gid-${id}`);
+                el.style.display = isMatch ? (el.tagName === 'TR' ? 'table-row' : 'block') : 'none';
+            });
+            
+            // Special case for responder form
+            const responderHidden = document.getElementById('responder-gid-hidden');
+            if (responderHidden) responderHidden.value = id;
+
+            showToast(`LINKED: ${name.toUpperCase()}`);
+        }
+
+        function setTab(e, id) {
+            document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const target = document.getElementById(id);
+            if (target) {
+                target.classList.add('active');
+                e.currentTarget.classList.add('active');
+                document.getElementById('view-title').innerText = e.currentTarget.innerText.trim();
+                
+                // If it's a guild-required tab and no guild is selected, show lock
+                const isRequired = target.classList.contains('guild-required');
+                document.getElementById('guild-lock').style.display = (isRequired && !selectedGid) ? 'block' : 'none';
+            }
+        }
+
+        function toggleSidebar(e) {
+            e.stopPropagation();
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function closeSidebarIfOpen(e) {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar.classList.contains('open') && !sidebar.contains(e.target)) {
+                sidebar.classList.remove('open');
+            }
+        }
+
+        async function saveSync(event, form) {
+            event.preventDefault();
+            const resp = await fetch('/update', { method: 'POST', body: new FormData(form) });
+            if (resp.ok) showToast("CLOUD SYNC COMPLETE");
+        }
+
+        async function addTrigger(event, form) {
+            event.preventDefault();
+            const formData = new FormData(form);
+            const resp = await fetch('/responder/add', { method: 'POST', body: formData });
+            if (resp.ok) {
+                showToast("TRIGGER INITIALIZED");
+                const trigger = formData.get('trigger');
+                const response = formData.get('response');
+                const gid = formData.get('guildId');
+                const tbody = document.getElementById('responder-table-body');
+                const row = document.createElement('tr');
+                row.className = `guild-specific-view gid-${gid}`;
+                row.style.display = 'table-row';
+                row.innerHTML = `<td style="color:var(--accent);"><b>${trigger}</b></td>
+                                 <td style="font-size:12px;">${response.substring(0,60)}...</td>
+                                 <td><button type="button" class="btn btn-danger" style="padding:8px;" onclick="delTrigger('${gid}', '${trigger.replace(/'/g, "\\'")}', this.parentElement.parentElement)"><i class="fas fa-trash"></i></button></td>`;
+                tbody.prepend(row);
+                form.reset();
+                document.getElementById('responder-gid-hidden').value = gid;
+            }
+        }
+
+        async function delTrigger(gid, trigger, rowEl) {
+            const resp = await fetch('/responder/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: `guildId=${gid}&trigger=${encodeURIComponent(trigger)}`
+            });
+            if (resp.ok) {
+                showToast("TRIGGER PURGED", true);
+                rowEl.remove();
+            }
+        }
+
+        async function upEco(uid, gid) {
+            const inputId = `eco-${gid}-${uid}`;
+            const coins = document.getElementById(inputId).value;
+            try {
+                const resp = await fetch('/economy/update', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: `guildId=${gid}&userId=${uid}&coins=${coins}`
+                });
+                if (resp.ok) showToast("LEDGER UPDATED");
+                else showToast("SYNC FAILED", true);
+            } catch (e) {
+                showToast("NETWORK ERROR", true);
+            }
+        }
+
+        async function sendMsg(gid) {
+            const chanId = document.getElementById(`chan-${gid}`).value;
+            const msg = document.getElementById(`msg-${gid}`).value;
+            if (!msg) return showToast("MESSAGE EMPTY", true);
+            
+            try {
+                const resp = await fetch('/action/send', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: `guildId=${gid}&channelId=${chanId}&message=${encodeURIComponent(msg)}`
+                });
+                if (resp.ok) {
+                    showToast("BROADCAST SENT");
+                    document.getElementById(`msg-${gid}`).value = '';
+                } else {
+                    showToast("BROADCAST FAILED", true);
+                }
+            } catch (e) {
+                showToast("NETWORK ERROR", true);
+            }
+        }
+
+        function showToast(msg, err = false) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.borderColor = err ? 'var(--danger)' : 'var(--accent)';
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        async function openT(id, name) {
+            document.getElementById('modal-title').innerText = `SESSION: ${name}`;
+            document.getElementById('modal-log').style.display = 'flex';
+            const fetchL = async () => {
+                const r = await fetch(`/ticket/${id}/messages`);
+                const msgs = await r.json();
+                const b = document.getElementById('modal-body');
+                b.innerHTML = msgs.map(m => `
+                    <div style="background:var(--surface-bright); padding:16px; border-radius:16px; border:1px solid var(--border); margin-bottom:12px;">
+                        <p style="font-size:11px; font-weight:800; color:var(--accent);">${m.author}</p>
+                        <p style="margin:4px 0">${m.content}</p>
+                        <p style="font-size:9px; color:var(--text-dim)">${m.time.substring(0,16).replace('T', ' ')}</p>
+                    </div>
+                `).join('') || '<p style="text-align:center; color:var(--text-dim)">NO DATA</p>';
+                b.scrollTop = b.scrollHeight;
+            };
+            fetchL();
+            poll = setInterval(fetchL, 3000);
+        }
+
+        function closeLog() {
+            document.getElementById('modal-log').style.display = 'none';
+            clearInterval(poll);
+        }
+
+        function filterGuilds() {
+            const input = document.getElementById('guild-search');
+            const filter = input.value.toLowerCase();
+            const options = document.querySelectorAll('.guild-option');
+            
+            options.forEach(opt => {
+                const text = opt.innerText.toLowerCase();
+                opt.style.display = text.includes(filter) ? 'block' : 'none';
+            });
+        }
+    </script>
+</body>
+</html>
